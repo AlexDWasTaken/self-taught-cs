@@ -20,15 +20,19 @@ begin
 	using Images
 	using PlutoUI
 	using HypertextLiteral
+	using OffsetArrays
 end
+
+# ╔═╡ 83eb9ca0-ed68-11ea-0bc5-99a09c68f867
+md"_homework 2, version 2_"
 
 # ╔═╡ ac8ff080-ed61-11ea-3650-d9df06123e1f
 md"""
 
-# **Homework 1** - _images and arrays_
+# **Homework 2** - _convolutions_
 `18.S191`, Spring 2021
 
-`Due Date`: **Friday Feb 26, 2021 at 11:59pm EST**
+`Due Date`: **Friday Mar 5, 2021 at 11:59pm EST**
 
 This notebook contains _built-in, live answer checks_! In some exercises you will see a coloured box, which runs a test case on your code, and provides feedback based on the result. Simply edit the code, run it, and the check runs again.
 
@@ -40,7 +44,7 @@ Feel free to ask questions!
 # ╔═╡ 911ccbce-ed68-11ea-3606-0384e7580d7c
 # edit the code below to set your name and kerberos ID (i.e. email without @mit.edu)
 
-student = (name = "ALexD", kerberos_id = "I'm only a self-learner anyway.")
+student = (name = "Alex_D", kerberos_id = "Self-taught-at-CUHK")
 
 # press the ▶ button in the bottom right of this cell to run your edits
 # or use Shift+Enter
@@ -55,588 +59,530 @@ Submission by: **_$(student.name)_** ($(student.kerberos_id)@mit.edu)
 """
 
 # ╔═╡ 5f95e01a-ee0a-11ea-030c-9dba276aba92
-md"""
-#### Intializing packages
+md"_Let's create a package environment:_"
 
-_When running this notebook for the first time, this could take up to 15 minutes. Hang in there!_
+# ╔═╡ e08781fa-ed61-11ea-13ae-91a49b5eb74a
+md"""
+
+## **Exercise 1** - _Convolutions in 1D_
+
+As we have seen in the lectures, we can produce cool effects using the mathematical technique of **convolutions**. We input one image $M$ and get a new image $M'$ back. 
+
+Conceptually we think of $M$ as a matrix. In practice, in Julia it will be a `Matrix` of color objects, and we may need to take that into account. Ideally, however, we should write a **generic** function that will work for any type of data contained in the matrix.
+
+A convolution works on a small **window** of an image, i.e. a region centered around a given point $(i, j)$. We will suppose that the window is a square region with odd side length $2\ell + 1$, running from $-\ell, \ldots, 0, \ldots, \ell$.
+
+The result of the convolution over a given window, centred at the point $(i, j)$ is a *single number*; this number is the value that we will use for $M'_{i, j}$.
+(Note that neighbouring windows overlap.)
+
+To get started, in Exercise 1 we'll restrict ourselves to convolutions in 1D.
+So a window is just a 1D region from $-\ell$ to $\ell$.
+
 """
 
-# ╔═╡ 540ccfcc-ee0a-11ea-15dc-4f8120063397
+# ╔═╡ 80108d80-ee09-11ea-0368-31546eb0d3cc
 md"""
-## **Exercise 1** - _Manipulating vectors (1D images)_
+#### Exercise 1.1
 
-A `Vector` is a 1D array. We can think of that as a 1D image.
-
+Let's create a vector `v` of random numbers of length `n=100`.
 """
 
-# ╔═╡ 467856dc-eded-11ea-0f83-13d939021ef3
-example_vector = [0.5, 0.4, 0.3, 0.2, 0.1, 0.0, 0.7, 0.0, 0.7, 0.9]
+# ╔═╡ 7fcd6230-ee09-11ea-314f-a542d00d582e
+n = 60
 
-# ╔═╡ ad6a33b0-eded-11ea-324c-cfabfd658b56
-md"""
-$(html"<br>")
-#### Exerise 1.1
-👉 Make a random vector `random_vect` of length 10 using the `rand` function.
-"""
+# ╔═╡ 7fdb34dc-ee09-11ea-366b-ffe10d1aa845
+v = rand(n)
 
-# ╔═╡ f51333a6-eded-11ea-34e6-bfbb3a69bcb0
-random_vect = rand(Float64, 10) # replace `missing` with your code!
+# ╔═╡ 7fe9153e-ee09-11ea-15b3-6f24fcc20734
+md"_Feel free to experiment with different values!_
 
-# ╔═╡ 5da8cbe8-eded-11ea-2e43-c5b7cc71e133
+Let's use the function `colored_line` to view this 1D number array as a 1D image.
+"
+
+# ╔═╡ ff70782e-e8d2-4281-9b24-d45c925f55e2
 begin
 	colored_line(x::Vector) = hcat(Gray.(Float64.(x)))'
 	colored_line(x::Any) = nothing
 end
 
-# ╔═╡ 56ced344-eded-11ea-3e81-3936e9ad5777
+# ╔═╡ 01070e28-ee0f-11ea-1928-a7919d452bdd
+colored_line(v)
+
+# ╔═╡ 7522f81e-ee1c-11ea-35af-a17eb257ff1a
+md"👉 Try changing `n` and `v` around. Notice that you can run the cell `v = rand(n)` again to regenerate new random values."
+
+# ╔═╡ 801d90c0-ee09-11ea-28d6-61b806de26dc
+md"""
+#### Exercise 1.2
+We need to decide how to handle the **boundary conditions**, i.e. what happens if we try to access a position in the vector `v` beyond `1:n`.  The simplest solution is to assume that $v_{i}$ is 0 outside the original vector; however, this may lead to strange boundary effects.
+    
+A better solution is to use the *closest* value that is inside the vector. Effectively we are extending the vector and copying the extreme values into the extended positions. (Indeed, this is one way we could implement this; these extra positions are called **ghost cells**.)
+
+👉 Write a function `extend(v, i)` that checks whether the position $i$ is inside `1:n`. If so, return the $(HTML("<br>")) ``i``th component of `v`; otherwise, return the nearest end value.
+"""
+
+# ╔═╡ 802bec56-ee09-11ea-043e-51cf1db02a34
+function extend(v::AbstractVector, i)
+	if i < 1
+		return v[1]
+	end
+	if i > length(v)
+		return v[end] 
+	end
+	return v[i]
+end
+
+# ╔═╡ b7f3994c-ee1b-11ea-211a-d144db8eafc2
+md"_Some test cases:_"
+
+# ╔═╡ 3492b164-7065-48e8-978b-6c96b965d376
+example_vector = [0.8, 0.2, 0.1, 0.7, 0.6, 0.4]
+
+# ╔═╡ 02123165-2a0a-49a8-b7a9-458955523511
 colored_line(example_vector)
 
-# ╔═╡ b18e2c54-edf1-11ea-0cbf-85946d64b6a2
-colored_line(random_vect)
+# ╔═╡ 806e5766-ee0f-11ea-1efc-d753cd83d086
+md"- Extended with 0:"
 
-# ╔═╡ 77adb065-bfd4-4680-9c2a-ad4d92689dbf
-md"#### Exerise 1.2
-👉 Make a function `my_sum` using a `for` loop, which computes the total of a vector of numbers."
+# ╔═╡ 38da843a-ee0f-11ea-01df-bfa8b1317d36
+colored_line([0, 0, example_vector..., 0, 0])
 
-# ╔═╡ bd907ee1-5253-4cae-b5a5-267dac24362a
-function my_sum(xs)
-	sum = 0
-	for i in xs
-		sum += i
-	end
-	return sum
-end
+# ╔═╡ 9bde9f92-ee0f-11ea-27f8-ffef5fce2b3c
+md"- Extended with your `extend` function:"
 
-# ╔═╡ 6640110a-d171-4b32-8d12-26979a36b718
-my_sum([1,2,3])
-
-# ╔═╡ cf738088-eded-11ea-2915-61735c2aa990
-md"#### Exerise 1.3
-👉 Use your `my_sum` function to write a function `mean`, which computes the mean/average of a vector of numbers."
-
-# ╔═╡ 0ffa8354-edee-11ea-2883-9d5bfea4a236
-function mean(xs)
-	
-	return my_sum(xs)/length(xs)
-end
-
-# ╔═╡ 1f104ce4-ee0e-11ea-2029-1d9c817175af
-mean([1, 2, 3])
-
-# ╔═╡ 1f229ca4-edee-11ea-2c56-bb00cc6ea53c
-md"👉 Define `m` to be the mean of `random_vect`."
-
-# ╔═╡ 2a391708-edee-11ea-124e-d14698171b68
-m = mean(random_vect) # replace `missing` with your code!
-
-# ╔═╡ bb0b959e-f6a0-4e42-a8aa-d105db1cba73
-
-
-# ╔═╡ e2863d4c-edef-11ea-1d67-332ddca03cc4
-md"""#### Exerise 1.4
-👉 Write a function `demean`, which takes a vector `xs` and subtracts the mean from each value in `xs`. Use your `mean` function!"""
-
-# ╔═╡ ea8d92f8-159c-4161-8c54-bab7bc00f290
+# ╔═╡ 431ba330-0f72-416a-92e9-55f51ff3bcd1
 md"""
-> ### Note about _mutation_
-> There are two ways to think about this exercise, you could _modify_ the original vector, or you can _create a new vector_. We often prefer the second version, so that the original data is preserved. We generally only use code of the first variant in the most performance-sensitive parts of a program, as it requires more care to write and use correctly. _**Be careful not to get carried away in optimizing code**, especially when learning a new language!_
-> 
-> There is a convention among Julians that functions that modify their argument have a `!` in their name. For example, `sort(x)` returns a sorted _copy_ of `x`, while `sort!(x)` _modifies_ `x` to be sorted.
-> 
-> #### Tips for writing non-mutating code
-> 1. _Rewriting_ an existing mutating function to be non-mutating can feel like a 'tedious' and 'inefficient' process. Often, instead of trying to **rewrite** a mutating function, it's best to take a step back and try to think of your problem as _constructing something new_. Instead of a `for` loop, it might make more sense to use **descriptive** primitives like [broadcasting with the dot syntax](https://docs.julialang.org/en/v1/manual/functions/#man-vectorized) (also for [math operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#man-dot-operators)), and [map and filter](https://www.youtube.com/watch?v=_O-HBDZMLrM).
-> 
-> 
-> 2. If a mutating algorithm makes the most sense for your problem, then you can first use `copy` to create a copy of an array, and then modify that copy.
-> 
-> We will cover this topic more in the later exercises!
+#### Exercise 1.3
+👉 Write (or copy) the `mean` function from Homework 1, which takes a vector and returns the mean.
 
 """
 
-# ╔═╡ ec5efe8c-edef-11ea-2c6f-afaaeb5bc50c
-function demean(xs)
-	meanm = mean(xs)
-	copym = xs .- meanm
-	return copym
+# ╔═╡ 5fdc5d0d-a52c-476e-b3b5-3b6364b706e4
+function mean(v)
+	sum = 0
+	for i in v
+		sum = sum + i
+	end
+	return sum / length(v)
 end
 
-# ╔═╡ d6ddafdd-1a44-48c7-b49a-554073cdf331
-test_vect = let
-	
-	# feel free to change your test case here!
-	to_create = [-1.0, -1.5, 8.5]
-	
-	
-	####
-	# this cell is a bit funky to deal with a common pitfall from last year
-	# it regenerates the vector if you accidentally wrote a mutating function
-	
-	# don't worry about how it works for this exercise!
-	
-	demean
-	to_create
-end
+# ╔═╡ e84c9cc2-e6e1-46f1-bf4e-9605da5e6f4a
+md"""
 
-# ╔═╡ 29e10640-edf0-11ea-0398-17dbf4242de3
-md"To verify our function, let's check that the mean of the `demean(test_vect)` is 0: (_Due to floating-point round-off error it may *not* be *exactly* 0._)"
+👉 Write a function `box_blur(v, l)` that blurs a vector `v` with a window of length `l` by averaging the elements within a window from $-\ell$ to $\ell$. This is called a **box blur**. Use your function `extend` to handle the boundaries correctly.
 
-# ╔═╡ 38155b5a-edf0-11ea-3e3f-7163da7433fb
-demeaned_test_vect = demean(test_vect)
+Return a vector of the same size as `v`.
+"""
 
-# ╔═╡ 1267e961-5b75-4b55-8080-d45316a03b9b
-mean(demeaned_test_vect)
+# ╔═╡ 809f5330-ee09-11ea-0e5b-415044b6ac1f
+md"""
+#### Exercise 1.4
+👉 Apply the box blur to your vector `v`. Show the original and the new vector by creating two cells that call `colored_line`. Make the parameter $\ell$ interactive, and call it `l_box` instead of `l` to avoid a naming conflict.
+"""
 
-# ╔═╡ a5f8bafe-edf0-11ea-0da3-3330861ae43a
+# ╔═╡ 302f0842-453f-47bd-a74c-7942d8c96485
+@bind l_box Slider(1:10)
+
+# ╔═╡ 80ab64f4-ee09-11ea-29b4-498112ed0799
 md"""
 #### Exercise 1.5
+The box blur is a simple example of a **convolution**, i.e. a linear function of a window around each point, given by 
 
-👉 Generate a vector of 100 elements. Where:
-- the center 20 elements are set to `1`, and
-- all other elements are `0`.
+$$v'_{i} = \sum_{m}  \, v_{i - m} \, k_{m},$$
+
+where $k$ is a vector called a **kernel**.
+    
+Again, we need to take care about what happens if $v_{i -m }$ falls off the end of the vector.
+    
+👉 Write a function `convolve(v, k)` that performs this convolution. You need to think of the vector $k$ as being *centred* on the position $i$. So $m$ in the above formula runs between $-\ell$ and $\ell$, where $2\ell + 1$ is the length of the vector $k$. 
+
+   You will either need to do the necessary manipulation of indices by hand, or use the `OffsetArrays.jl` package.
 """
 
-# ╔═╡ b6b65b94-edf0-11ea-3686-fbff0ff53d08
+# ╔═╡ cf73f9f8-ee12-11ea-39ae-0107e9107ef5
+md"_Edit the cell above, or create a new cell with your own test cases!_"
+
+# ╔═╡ fa463b71-5aa4-44a3-a67b-6b0776236243
+md"""
+#### Exercise 1.6
+
+👉 Define a function `box_blur_kernel(l)` which returns a _kernel_ (i.e. a vector) which, when used as the kernel in `convolve`, will reproduce a box blur of length `l`.
+"""
+
+# ╔═╡ 8a7d3cfd-6f19-43f0-ae16-d5a236f148e7
+function box_blur_kernel(l)
+	non_offset_kernel = [1 / (2*l+1) for i ∈ 1:2l+1]
+	return OffsetArray(non_offset_kernel, -l:l)
+end
+
+# ╔═╡ a34d1ad8-3776-4bc4-93e5-72cfffc54f15
+@bind box_kernel_l Slider(1:5)
+
+# ╔═╡ 971a801d-9c46-417a-ad31-1144894fb4e1
+box_blur_kernel_test = box_blur_kernel(box_kernel_l)
+
+# ╔═╡ 5f13b1a5-8c7d-47c9-b96a-a09faf38fe5e
+md"""
+Let's apply your kernel to our test vector `v` (first cell), and compare the result to our previous box blur function (second cell). The two should be identical.
+"""
+
+# ╔═╡ 03f91a22-1c3e-4c42-9d78-1ee36851a120
+md"""
+#### Exercise 1.7
+👉 Write a function `gaussian_kernel`.
+
+The definition of a Gaussian in 1D is
+
+$$G(x) = \frac{1}{\sqrt{2\pi \sigma^2}} \exp \left( \frac{-x^2}{2\sigma^2} \right),$$
+
+or as a Julia function:
+"""
+
+# ╔═╡ 48530f0d-49b4-4aec-8109-d69f1ef7f0ee
+md"""
+Write a function `gauss` that takes `σ` as a keyword argument and implements this function.
+"""
+
+# ╔═╡ beb62fda-38a6-4528-a176-cfb726f4b5bd
+gauss(x::Real; σ=1) = 1 / sqrt(2π*σ^2) * exp(-x^2 / (2 * σ^2))
+
+# ╔═╡ f0d55cec-2e81-4cbb-b166-2cf4f2a0f43f
+md"""
+We need to **sample** (i.e. evaluate) this at each pixel in an interval of length $2n+1$,
+and then **normalize** so that the sum of the resulting kernel is 1.
+"""
+
+# ╔═╡ f8bd22b8-ee14-11ea-04aa-ab16fd01826e
+md"""
+You can edit the cell above to test your kernel function!
+
+Let's try applying it in a convolution.
+"""
+
+# ╔═╡ 2a9dd06a-ee13-11ea-3f84-67bb309c77a8
+@bind gaussian_kernel_size_1D Slider(0:6)
+
+# ╔═╡ ce24e486-df27-4780-bc57-d3bf7bee83bb
 function create_bar()
-	# your code here!
-	result = zeros(Int, 100)
-	result[41 : 60] .= 1
+	x = zeros(100)
+	x[41:60] .= 1
+	x
+end
+
+# ╔═╡ b01858b6-edf3-11ea-0826-938d33c19a43
+md"""
+ 
+   
+## **Exercise 2** - _Convolutions in 2D_
+    
+Now let's move to 2D images. The convolution is then given by a **kernel matrix** $K$:
+    
+$$M'_{i, j} = \sum_{k, l}  \, M_{i- k, j - l} \, K_{k, l},$$
+    
+where the sum is over the possible values of $k$ and $l$ in the window. Again we think of the window as being *centered* at $(i, j)$.
+
+A common notation for this operation is $\star$:
+
+```math
+M' = M \star K
+```
+"""
+
+# ╔═╡ 7c1bc062-ee15-11ea-30b1-1b1e76520f13
+md"""
+#### Exercise 2.1
+👉 Write a new method for `extend` that takes a matrix `M` and indices `i` and `j`, and returns the closest element of the matrix.
+"""
+
+# ╔═╡ 7c2ec6c6-ee15-11ea-2d7d-0d9401a5e5d1
+function extend(M::AbstractMatrix, i, j)
+	
+	return missing
+end
+
+# ╔═╡ 803905b2-ee09-11ea-2d52-e77ff79693b0
+extend([5,6,7], 1)
+
+# ╔═╡ 80479d98-ee09-11ea-169e-d166eef65874
+extend([5,6,7], -8)
+
+# ╔═╡ 805691ce-ee09-11ea-053d-6d2e299ee123
+extend([5,6,7], 10)
+
+# ╔═╡ 45c4da9a-ee0f-11ea-2c5b-1f6704559137
+if extend(v,1) === missing
+	missing
+else
+	colored_line([extend(example_vector, i) for i in -1:length(example_vector)+2])
+end
+
+# ╔═╡ 807e5662-ee09-11ea-3005-21fdcc36b023
+function box_blur(v::AbstractArray, l)
+	return [
+		mean([extend(v, i) for i in j-l:j+l])
+		for j in 1:length(v)
+		]
+end
+
+# ╔═╡ 4f08ebe8-b781-4a32-a218-5ecd8338561d
+colored_line(box_blur(example_vector, 1))
+
+# ╔═╡ 808deca8-ee09-11ea-0ee3-1586fa1ce282
+let
+	try
+		test_v = rand(n)
+		original = copy(test_v)
+		box_blur(test_v, 5)
+		if test_v != original
+			md"""
+			!!! danger "Oopsie!"
+			    It looks like your function _modifies_ `v`. Can you write it without doing so? Maybe you can use `copy`.
+			"""
+		end
+	catch
+	end
+end
+
+# ╔═╡ e555a7e6-f11a-43ac-8218-6d832f0ce251
+new_line = box_blur(v, l_box)
+
+# ╔═╡ 7d80a1ea-a0a9-41b2-9cfe-a334717ab2f4
+colored_line(new_line)
+
+# ╔═╡ bbe1a562-8d97-4112-a88a-c45c260f574d
+let
+	result = box_blur(v, box_kernel_l)
+	colored_line(result)
+end
+
+# ╔═╡ 28e20950-ee0c-11ea-0e0a-b5f2e570b56e
+function convolve(v::AbstractVector, k)
+	l = (length(k) - 1) ÷ 2
+	k_offset = OffsetArray(k, -l:l)
+	result = [
+		sum(
+			[ extend(v, j) * k_offset[ j - i ]
+				for j in i-l:i+l
+			]
+		)
+		for i in 1:length(v)
+	]
 	return result
 end
 
-# ╔═╡ 4a5e9d2c-dd90-4bb0-9e31-3f5c834406b4
-create_bar()
+# ╔═╡ 9afc4dca-ee16-11ea-354f-1d827aaa61d2
+md"_Let's test it!_"
 
-# ╔═╡ d862fb16-edf1-11ea-36ec-615d521e6bc0
-colored_line(create_bar())
+# ╔═╡ cf6b05e2-ee16-11ea-3317-8919565cb56e
+small_image = Gray.(rand(5,5))
 
-# ╔═╡ 59414833-a108-4b1e-9a34-0f31dc907c6e
+# ╔═╡ e3616062-ee27-11ea-04a9-b9ec60842a64
+md"- Extended with `0`:"
+
+# ╔═╡ e5b6cd34-ee27-11ea-0d60-bd4796540b18
+[get(small_image, (i, j), Gray(0)) for (i,j) in Iterators.product(-1:7,-1:7)]
+
+# ╔═╡ b4e98589-f221-4922-b11e-364d72d0788e
+
+
+# ╔═╡ d06ea762-ee27-11ea-2e9c-1bcff86a3fe0
+md"- Extended with your `extend` function:"
+
+# ╔═╡ e1dc0622-ee16-11ea-274a-3b6ec9e15ab5
+[extend(small_image, i, j) for (i,j) in Iterators.product(-1:7,-1:7)]
+
+# ╔═╡ 4bbea325-35f8-4a51-bd66-153aba4aed96
+md"""
+### Extending Philip
+"""
+
+# ╔═╡ c4f5a867-74ba-4106-91d4-195f6ae644d0
 url = "https://user-images.githubusercontent.com/6933510/107239146-dcc3fd00-6a28-11eb-8c7b-41aaf6618935.png" 
 
-# ╔═╡ c5484572-ee05-11ea-0424-f37295c3072d
+# ╔═╡ c825ebe2-511b-43ba-afdf-6226dbac48d2
 philip_filename = download(url) # download to a local file. The filename is returned
 
-# ╔═╡ c8ecfe5c-ee05-11ea-322b-4b2714898831
-philip = load(philip_filename)
+# ╔═╡ 2701ab0c-b91d-47fe-b36b-4e0036ecd4aa
+philip = load(philip_filename);
 
-# ╔═╡ e86ed944-ee05-11ea-3e0f-d70fc73b789c
-md"_Hi there Philip_"
+# ╔═╡ 84a48984-9adb-40ab-a1f1-1ab7b76c9a19
+philip_head = philip[470:800, 140:410];
 
-# ╔═╡ 6ccd8902-0dd9-4335-a11a-ee7f9a1a6c09
-philip_head = philip[470:800, 140:410]
-
-# ╔═╡ 15088baa-c337-405d-8885-19a6e2bfd6aa
-md"""
-Recall from [Section 1.1](https://computationalthinking.mit.edu/Spring21/week1/) that in Julia, an _image_ is just a 2D array of color objects:
-"""
-
-# ╔═╡ 7ad4f6bc-588e-44ab-8ca9-c87cd1048442
-typeof(philip)
-
-# ╔═╡ a55bb5ca-600b-4aa0-b95f-7ece20845c9b
-md"""
-Every pixel (i.e. _element of the 2D array_) is of the `RGB` type:
-"""
-
-# ╔═╡ c5dc0cc8-9305-47e6-8b20-a9f8ef867799
-philip_pixel = philip[100,100]
-
-# ╔═╡ de772e21-0bea-4fd2-868a-9a7d32550bc9
-typeof(philip_pixel)
-
-# ╔═╡ 21bdc692-91ee-474d-ae98-455913a2342e
-md"""
-To get the values of its individual color channels, use the `r`, `g` and `b` _attributes_:
-"""
-
-# ╔═╡ 2ae3f379-96ce-435d-b863-deba4586ec71
-philip_pixel.r, philip_pixel.g, philip_pixel.b
-
-# ╔═╡ c49ba901-d798-489a-963c-4cc113c7abfd
-md"""
-And to create an `RGB` object yourself:
-"""
-
-# ╔═╡ 93451c37-77e1-4d4f-9788-c2a3da1401ee
-RGB(0.1, 0.4, 0.7)
-
-# ╔═╡ f52e4914-2926-4a42-9e45-9caaace9a7db
-md"""
-#### Exerise 2.1
-👉 Write a function **`get_red`** that takes a single pixel, and returns the value of its red channel.
-"""
-
-# ╔═╡ a8b2270a-600c-4f83-939e-dc5ab35f4735
-function get_red(pixel::AbstractRGB)
-	# your code here!
-	return pixel.r
-end
-
-# ╔═╡ c320b39d-4cea-4fa1-b1ce-053c898a67a6
-get_red(RGB(0.8, 0.1, 0.0))
-
-# ╔═╡ d8cf9bd5-dbf7-4841-acf9-eef7e7cabab3
-md"""
-#### Exerise 2.2
-👉 Write a function **`get_reds`** (note the extra `s`) that accepts a 2D color array called `image`, and returns a 2D array with the red channel value of each pixel. (The result should be a 2D array of _numbers_.) Use your function `get_red` from the previous exercise.
-"""
-
-# ╔═╡ ebe1d05c-f6aa-437d-83cb-df0ba30f20bf
-function get_reds(image::AbstractMatrix)
-	# your code here!
-	result = get_red.(image)
-	return result
-end
-
-# ╔═╡ c427554a-6f6a-43f1-b03b-f83239887cee
-get_reds(philip_head)
-
-# ╔═╡ 4fd07e01-2f8b-4ec9-9f4f-8a9e5ff56fb6
-md"""
-
-Great! By extracting the red channel value of each pixel, we get a 2D array of numbers. We went from an image (2D array of RGB colors) to a matrix (2D array of numbers).
-
-#### Exerise 2.3
-Let's try to visualize this matrix. Right now, it is displayed in text form, but because the image is quite large, most rows and columns don't fit on the screen. Instead, a better way to visualize it is to **view a number matrix as an image**.
-
-This is easier than you might think! We just want to map each number to an `RGB` object, and the result will be a 2D array of `RGB` objects, which Julia will display as an image.
-
-First, let's define a function that turns a _number_ into a _color_.
-"""
-
-# ╔═╡ 97c15896-6d99-4292-b7d7-4fcd2353656f
-function value_as_color(x)
-	
-	return RGB(x, 0, 0)
-end
-
-# ╔═╡ cbb9bf41-4c21-42c7-b0e0-fc1ce29e0eb1
-value_as_color(0.0), value_as_color(0.6), value_as_color(1.0)
-
-# ╔═╡ 3f1a670b-44c2-4cab-909c-65f4ae9ed14b
-md"""
-👉 Use the functions `get_reds` and `value_as_color` to visualize the red channel values of `philip_head`. Tip: Like in previous exercises, use broadcasting ('dot syntax') to apply a function _element-wise_.
-
-Use the ➕ button at the bottom left of this cell to add more cells.
-"""
-
-# ╔═╡ 21ba6e75-55a2-4614-9b5d-ea6378bf1d98
-red_philip = value_as_color.(get_reds(philip_head))
-
-# ╔═╡ f7825c18-ff28-4e23-bf26-cc64f2f5049a
-md"""
-
-#### Exerise 2.4
-👉 Write four more functions, `get_green`, `get_greens`, `get_blue` and `get_blues`, to be the equivalents of `get_red` and `get_reds`. Use the ➕ button at the bottom left of this cell to add new cells.
-"""
-
-# ╔═╡ d994e178-78fd-46ab-a1bc-a31485423cad
-function get_green(pixel::AbstractRGB)
-	# your code here!
-	return pixel.g
-end
-
-# ╔═╡ 354e20ae-9d78-4740-ba2a-20d1dcc766b7
-function get_blue(pixel::AbstractRGB)
-	# your code here!
-	return pixel.b
-end
-
-# ╔═╡ 2fedf27b-05c2-44c4-a6a7-2bf9a169ced9
-function get_greens(image::AbstractMatrix)
-	# your code here!
-	result = get_green.(image)
-	return result
-end
-
-# ╔═╡ ef2a6908-d0eb-4e9c-92c0-a6d8b5024dc3
-function get_blues(image::AbstractMatrix)
-	# your code here!
-	result = get_blue.(image)
-	return result
-end
-
-# ╔═╡ c54ccdea-ee05-11ea-0365-23aaf053b7d7
-md"""
-#### Exercise 2.5
-👉 Write a function **`mean_color`** that accepts an object called `image`. It should calculate the mean amounts of red, green and blue in the image and return the average color. Be sure to use functions from previous exercises!
-"""
-
-# ╔═╡ f6898df6-ee07-11ea-2838-fde9bc739c11
-function mean_color(image)
-	# your code here!
-	mean_red = mean(get_reds(image)) #/ length(image)
-	mean_green = mean(get_greens(image)) #/ length(image)
-	mean_blue = mean(get_blues(image)) #/ length(image)
-	return RGB(mean_red, mean_green, mean_blue)
-end
-
-# ╔═╡ 5be9b144-ee0d-11ea-2a8d-8775de265a1d
-mean_color(philip)
-
-# ╔═╡ 5f6635b4-63ed-4a62-969c-bd4084a8202f
-md"""
-_At the end of this homework, you can see all of your filters applied to your webcam image!_
-"""
-
-# ╔═╡ 63e8d636-ee0b-11ea-173d-bd3327347d55
-function invert(color::AbstractRGB)
-	# your code here!
-	return RGB(1-color.r, 1-color.g, 1-color.b)
-end
-
-# ╔═╡ 2cc2f84e-ee0d-11ea-373b-e7ad3204bb00
-md"Let's invert some colors:"
-
-# ╔═╡ b8f26960-ee0a-11ea-05b9-3f4bc1099050
-color_black = RGB(0.0, 0.0, 0.0)
-
-# ╔═╡ 5de3a22e-ee0b-11ea-230f-35df4ca3c96d
-invert(color_black)
-
-# ╔═╡ 4e21e0c4-ee0b-11ea-3d65-b311ae3f98e9
-color_red = RGB(0.8, 0.1, 0.1)
-
-# ╔═╡ 6dbf67ce-ee0b-11ea-3b71-abc05a64dc43
-invert(color_red)
-
-# ╔═╡ 846b1330-ee0b-11ea-3579-7d90fafd7290
-md"👉 Can you invert the picture of Philip?"
-
-# ╔═╡ 943103e2-ee0b-11ea-33aa-75a8a1529931
-philip_inverted = invert.(philip) # replace `missing` with your code!
-
-# ╔═╡ 55b138b7-19fb-4da1-9eb1-1e8304528251
-md"""
-_At the end of this homework, you can see all of your filters applied to your webcam image!_
-"""
-
-# ╔═╡ f68d4a36-ee07-11ea-0832-0360530f102e
-md"""
-#### Exercise 3.2
-👉 Look up the documentation on the `floor` function. Use it to write a function `quantize(x::Number)` that takes in a value $x$ (which you can assume is between 0 and 1) and "quantizes" it into bins of width 0.1. For example, check that 0.267 gets mapped to 0.2.
-"""
-
-# ╔═╡ fbd1638d-8d7a-4d12-aff9-9c160cc3fd74
-function quantize(x::Number)
-	# your code here!
-	return floor(x * 10) / 10
-end
-
-# ╔═╡ 7720740e-2d2b-47f7-98fd-500ed3eee479
-md"""
-#### Intermezzo: _multiple methods_
-
-In Julia, we often write multiple methods for the same function. When a function is called, the method is chosen based on the input arguments. Let's look at an example:
-
-These are two _methods_ to the same function, because they have 
-
-> **the same name, but different input types**
-"""
-
-# ╔═╡ 90421bca-0804-4d6b-8bd0-3ddbd54cc5fe
-function double(x::Number)
-	
-	return x * 2
-end
-
-# ╔═╡ b2329e4c-6204-453e-8998-2414b869b808
-function double(x::Vector)
-	
-	return [x..., x...]
-end
-
-# ╔═╡ 23fcd65f-0182-41f3-80ec-d85b05136c47
-md"""
-When we call the function `double`, Julia will decide which method to call based on the given input argument!
-"""
-
-# ╔═╡ 5055b74c-b98d-41fa-a0d8-cb36200d82cc
-double(24)
-
-# ╔═╡ 8db17b2b-0cf9-40ba-8f6f-2e53be7b6355
-double([1,2,37])
-
-# ╔═╡ a8a597e0-a01c-40cd-9902-d56430afd938
-md"""
-We call this **multiple dispatch**, and it is one of Julia's key features. Throughout this course, you will see lots of real-world application, and learn to use multiple dispatch to create flexible and readable abstractions!
-"""
-
-# ╔═╡ f6b218c0-ee07-11ea-2adb-1968c4fd473a
-md"""
-#### Exercise 3.3
-👉 Write the second **method** of the function `quantize`, i.e. a new *version* of the function with the *same* name. This method will accept a color object called `color`, of the type `AbstractRGB`. 
-    
-Here, `::AbstractRGB` is a **type annotation**. This ensures that this version of the function will be chosen when passing in an object whose type is a **subtype** of the `AbstractRGB` abstract type. For example, both the `RGB` and `RGBX` types satisfy this.
-
-The method you write should return a new `RGB` object, in which each component ($r$, $g$ and $b$) are quantized. Use your previous method for `quantize`!
-"""
-
-# ╔═╡ 04e6b486-ceb7-45fe-a6ca-733703f16357
-function quantize(color::AbstractRGB)
-	# your code here!
-	#newr = floor(10 * color.r) / 10
-	#newg = floor(10 * color.g) / 10
-	#newb = floor(10 * color.b) / 10
-	#return RGB(newr, newg, newb)
-	return RGB(quantize(color.r), quantize(color.g), quantize(color.b))
-end
-
-# ╔═╡ f6bf64da-ee07-11ea-3efb-05af01b14f67
-md"""
-#### Exercise 3.4
-👉 Write a method `quantize(image::AbstractMatrix)` that quantizes an image by quantizing each pixel in the image. (You may assume that the matrix is a matrix of color objects.)
-"""
-
-# ╔═╡ 13e9ec8d-f615-4833-b1cf-0153010ccb65
-function quantize(image::AbstractMatrix)
-	new_image = quantize.(image)
-	return new_image
-end
-
-# ╔═╡ f6a655f8-ee07-11ea-13b6-43ca404ddfc7
-quantize(0.267), quantize(0.91)
-
-# ╔═╡ 25dad7ce-ee0b-11ea-3e20-5f3019dd7fa3
-md"Let's apply your method!"
-
-# ╔═╡ 9751586e-ee0c-11ea-0cbb-b7eda92977c9
-quantize(philip)
-
-# ╔═╡ f6d6c71a-ee07-11ea-2b63-d759af80707b
-md"""
-#### Exercise 3.5
-👉 Write a function `noisify(x::Number, s)` to add randomness of intensity $s$ to a value $x$, i.e. to add a random value between $-s$ and $+s$ to $x$. If the result falls outside the range $[0, 1]$ you should "clamp" it to that range. (Julia has a built-in `clamp` function, or you can write your own function.)
-"""
-
-# ╔═╡ f38b198d-39cf-456f-a841-1ba08f206010
-function noisify(x::Number, s)
-	# your code here!
-	noise = (rand() - 0.5) * 2 * s
-	return clamp(x + noise, 0, 1)
-end
-
-# ╔═╡ f6fc1312-ee07-11ea-39a0-299b67aee3d8
-md"""
-👉  Write the second method `noisify(c::AbstractRGB, s)` to add random noise of intensity $s$ to each of the $(r, g, b)$ values in a colour. 
-
-Use your previous method for `noisify`. _(Remember that Julia chooses which method to use based on the input arguments. So to call the method from the previous exercise, the first argument should be a number.)_
-"""
-
-# ╔═╡ db4bad9f-df1c-4640-bb34-dd2fe9bdce18
-function noisify(color::AbstractRGB, s)
-	# your code here!
-	#newr = noisify(color.r, s)
-	#newg = noisify(color.g, s)
-	#newb = noisify(color.b, s)
-	newr, newg, newb = noisify(color.r, s), noisify(color.g, s), noisify(color.b, s)
-	return RGB(newr, newg, newb)
-end
-
-# ╔═╡ 0000b7f8-4c43-4dd8-8665-0dfe59e74c0a
-md"""
-Noise strength:
-"""
-
-# ╔═╡ 774b4ce6-ee1b-11ea-2b48-e38ee25fc89b
-@bind color_noise Slider(0:0.01:1, show_value=true)
-
-# ╔═╡ 48de5bc2-72d3-11eb-3fd9-eff2b686cb75
-md"""
-> ### Note about _array comprehension_
-> At this point, you already know of a few ways to make a new array based on one that already exists.
-> 1. you can use a for loop to go through a array
-> 1. you can use function broadcasting over a array
-> 1. you can use _**array comprehension**_!
->
-> The third option you are about to see demonstrated below and following the following syntax:
->
-> ```[function_to_apply(args) for args in some_iterable_of_your_choice]```
->
-> This creates a new iterable that matches what you iterate through in the second part of the comprehension. Below is an example with `for` loops through two iterables that creates a 2-dimensional `Array`.
-"""
-
-# ╔═╡ f70823d2-ee07-11ea-2bb3-01425212aaf9
-md"""
-👉 Write the third method `noisify(image::AbstractMatrix, s)` to noisify each pixel of an image. This function should be a single line!
-"""
-
-# ╔═╡ 21a5885d-00ab-428b-96c3-c28c98c4ca6d
-function noisify(image::AbstractMatrix, s)
-	# your code here!
-	new_image = noisify.(image, s)
-	return new_image
-end
-
-# ╔═╡ 1ea53f41-b791-40e2-a0f8-04e13d856829
-noisify(0.5, 0.1) # edit this test case!
-
-# ╔═╡ 7e4aeb70-ee1b-11ea-100f-1952ba66f80f
-(original=color_red, with_noise=noisify(color_red, color_noise))
-
-# ╔═╡ 8e848279-1b3e-4f32-8c0c-45693d12de96
+# ╔═╡ 3cd535e4-ee26-11ea-2482-fb4ad43dda19
 [
-	noisify(color_red, strength)
-	for 
-		
-		strength in 0 : 0.05 : 1,
-		row in 1:10
-		
-]'
+	extend(philip_head, i, j) for 
+		i in -50:size(philip_head,1)+51,
+		j in -50:size(philip_head,2)+51
+]
 
-# ╔═╡ d896b7fd-20db-4aa9-bbcf-81b1cd44ec46
+# ╔═╡ 7c41f0ca-ee15-11ea-05fb-d97a836659af
 md"""
-
-#### Exerise 3.6
-Move the slider below to set the amount of noise applied to the image of Philip.
+#### Exercise 2.2
+👉 Implement a new method `convolve(M, K)` that applies a convolution to a 2D array `M`, using a 2D kernel `K`. Use your new method `extend` from the last exercise.
 """
 
-# ╔═╡ e70a84d4-ee0c-11ea-0640-bf78653ba102
-@bind philip_noise Slider(0:0.01:2, show_value=true)
-
-# ╔═╡ ac15e0d0-ee0c-11ea-1eaf-d7f88b5df1d7
-noisify(philip_head, philip_noise)
-
-# ╔═╡ 9604bc44-ee1b-11ea-28f8-7f7af8d0cbb2
-if philip_noise == 1
-	md"""
-	> #### What's this?
-	> 
-	> The noise intensity is `1.0`, but we can still recognise Philip in the picture... 
-	> 
-	> 👉 Modify the definition of the slider to go further than `1.0`.
-	"""
+# ╔═╡ 8b96e0bc-ee15-11ea-11cd-cfecea7075a0
+function convolve(M::AbstractMatrix, K::AbstractMatrix)
+	
+	return missing
 end
 
-# ╔═╡ f714699e-ee07-11ea-08b6-5f5169861b57
-md"""
-👉 For which noise intensity does it become unrecognisable? 
-
-You may need noise intensities larger than 1. Why?
-
-"""
-
-# ╔═╡ bdc2df7c-ee0c-11ea-2e9f-7d2c085617c1
-answer_about_noise_intensity = md"""
-Because a few of the pixels are still close to their original color, and our eye is able to grasp the difference.
-"""
-
-# ╔═╡ e87e0d14-43a5-490d-84d9-b14ece472061
-md"""
-### Results
-"""
-
-# ╔═╡ ee5f21fb-1076-42b6-8926-8bbb6ed0ad67
-function custom_filter(pixel::AbstractRGB)
-	
-	# your code here!
-	
-	return pixel
+# ╔═╡ 93284f92-ee12-11ea-0342-833b1a30625c
+test_convolution = let
+	v = [1, 10, 100, 1000, 10000]
+	k = [1, 1, 0]
+	convolve(v, k)
 end
 
-# ╔═╡ 9e5a08dd-332a-486b-94ab-15c49e72e522
-function custom_filter(image::AbstractMatrix)
+# ╔═╡ 5eea882c-ee13-11ea-0d56-af81ecd30a4a
+colored_line(test_convolution)
+
+# ╔═╡ 338b1c3f-f071-4f80-86c0-a82c17349828
+let
+	result = convolve(v, box_blur_kernel_test)
+	colored_line(result)
+end
+
+# ╔═╡ 5a5135c6-ee1e-11ea-05dc-eb0c683c2ce5
+md"_Let's test it out! 🎃_"
+
+# ╔═╡ 577c6daa-ee1e-11ea-1275-b7abc7a27d73
+test_image_with_border = [get(small_image, (i, j), Gray(0)) for (i,j) in Iterators.product(-1:7,-1:7)]
+
+# ╔═╡ 275a99c8-ee1e-11ea-0a76-93e3618c9588
+K_test = [
+	0   0  0
+	1/2 0  1/2
+	0   0  0
+]
+
+# ╔═╡ 42dfa206-ee1e-11ea-1fcd-21671042064c
+convolve(test_image_with_border, K_test)
+
+# ╔═╡ 6e53c2e6-ee1e-11ea-21bd-c9c05381be07
+md"_Edit_ `K_test` _to create your own test case!_"
+
+# ╔═╡ e7f8b41a-ee25-11ea-287a-e75d33fbd98b
+convolve(philip_head, K_test)
+
+# ╔═╡ 8a335044-ee19-11ea-0255-b9391246d231
+md"""
+---
+
+You can create all sorts of effects by choosing the kernel in a smart way. Today, we will implement two special kernels, to produce a **Gaussian blur** and a **Sobel edge detection** filter.
+
+Make sure that you have watched the lecture about convolutions!
+"""
+
+# ╔═╡ 79eb0775-3582-446b-996a-0b64301394d0
+md"""
+#### Exercise 2.3
+The 2D Gaussian kernel will be defined using
+
+$$G(x,y)=\frac{1}{2\pi \sigma^2}\exp\left(\frac{-(x^2+y^2)}{2\sigma^2}\right)$$
+
+How can you express this mathematically using the 1D Gaussian function that we defined before?
+"""
+
+# ╔═╡ f4d9fd6f-0f1b-4dec-ae68-e61550cee790
+gauss(x, y; σ=1) = 2π*σ^2 * gauss(x; σ=σ) * gauss(y; σ=σ)
+
+# ╔═╡ 1c8b4658-ee0c-11ea-2ede-9b9ed7d3125e
+function gaussian_kernel_1D(n; σ = 1)
+	kernal = [gauss(i; σ = σ) for i in -n:n]
+	kernal = kernal ./ sum(kernal)
+	return kernal
+end
+
+# ╔═╡ a6149507-d5ba-45c1-896a-3487070d36ec
+colored_line(gaussian_kernel_1D(4; σ=1))
+
+# ╔═╡ 38eb92f6-ee13-11ea-14d7-a503ac04302e
+test_gauss_1D_a = let
+	k = gaussian_kernel_1D(gaussian_kernel_size_1D)
 	
-	return custom_filter.(image)
+	if k !== missing
+		convolve(v, k)
+	end
+end
+
+# ╔═╡ b424e2aa-ee14-11ea-33fa-35491e0b9c9d
+colored_line(test_gauss_1D_a)
+
+# ╔═╡ 24c21c7c-ee14-11ea-1512-677980db1288
+test_gauss_1D_b = let
+	v = create_bar()
+	k = gaussian_kernel_1D(gaussian_kernel_size_1D)
+	
+	if k !== missing
+		convolve(v, k)
+	end
+end
+
+# ╔═╡ bc1c20a4-ee14-11ea-3525-63c9fa78f089
+colored_line(test_gauss_1D_b)
+
+# ╔═╡ 7c50ea80-ee15-11ea-328f-6b4e4ff20b7e
+md"""
+👉 Write a function that applies a **Gaussian blur** to an image. Use your previous functions, and add cells to write helper functions as needed!
+"""
+
+# ╔═╡ aad67fd0-ee15-11ea-00d4-274ec3cda3a3
+function with_gaussian_blur(image; σ=3, l=5)
+	
+	return missing
+end
+
+# ╔═╡ 8ae59674-ee18-11ea-3815-f50713d0fa08
+md"_Let's make it interactive. 💫_"
+
+# ╔═╡ 96146b16-79ea-401f-b8ba-e05663a18bd8
+@bind face_σ Slider(0.1:0.1:10; show_value=true)
+
+# ╔═╡ 2cc745ce-e145-4428-af3b-926fba271b67
+@bind face_l Slider(0:20; show_value=true)
+
+# ╔═╡ d5ffc6ab-156b-4d43-ac3d-1947d0176e7f
+md"""
+When you set `face_σ` to a low number (e.g. `2.0`), what effect does `face_l` have? And vice versa?
+"""
+
+# ╔═╡ 7c6642a6-ee15-11ea-0526-a1aac4286cdd
+md"""
+#### Exercise 2.4
+👉 Create a **Sobel edge detection filter**.
+
+Here, we will need to create two filters that separately detect edges in the horizontal and vertical directions, given by the following kernels:
+
+```math
+G_x = \begin{bmatrix}
+1 & 0 & -1 \\
+2 & 0 & -2 \\
+1 & 0 & -1 \\
+\end{bmatrix};
+\qquad
+G_y = \begin{bmatrix}
+1 & 2 & 1 \\
+0 & 0 & 0 \\
+-1 & -2 & -1 \\
+\end{bmatrix} 
+```
+
+We can think of these filterrs as derivatives in the $x$ and $y$ directions, as we discussed in lectures.
+
+Then we combine them by finding the magnitude of the **gradient** (in the sense of multivariate calculus) by defining
+
+$$G_\text{total} = \sqrt{G_x^2 + G_y^2},$$
+
+where each operation applies *element-wise* on the matrices.
+
+Use your previous functions, and add cells to write helper functions as needed!
+"""
+
+# ╔═╡ 9eeb876c-ee15-11ea-1794-d3ea79f47b75
+function with_sobel_edge_detect(image)
+	
+	return missing
 end
 
 # ╔═╡ 8ffe16ce-ee20-11ea-18bd-15640f94b839
@@ -647,209 +593,90 @@ if student.kerberos_id === "jazz"
 	"""
 end
 
-# ╔═╡ 756d150a-b7bf-4bf5-b372-5b0efa80d987
+# ╔═╡ 2d9f3ae4-9e4c-49ce-aab0-5f87aba85c3e
 md"## Function library
 
 Just some helper functions used in the notebook."
 
-# ╔═╡ 4bc94bec-da39-4f8a-82ee-9953ed73b6a4
+# ╔═╡ 5516c800-edee-11ea-12cf-3f8c082ef0ef
 hint(text) = Markdown.MD(Markdown.Admonition("hint", "Hint", [text]))
 
-# ╔═╡ b1d5ca28-edf6-11ea-269e-75a9fb549f1d
+# ╔═╡ ea435e58-ee11-11ea-3785-01af8dd72360
+hint(md"Have a look at the lecture notes to see examples of adding interactivity with a slider. You can read the Interactivity and the PlutoUI sample notebooks to learn more, you can find them in Pluto's main menu. _(Right click the Pluto logo in the top left -> Open in new tab)_.")
+
+# ╔═╡ 32a07f1d-93cd-4bf3-bac1-91afa6bb88a6
 md"""
-You can find out more about any function (like `rand`) by clicking on the Live Docs in the bottom right of this Pluto window, and typing a function name in the top.
+You can use the `÷` operator (you type `\div<TAB>` to get it with autocomplete) to do _integer division_. For example:
 
-![image](https://user-images.githubusercontent.com/6933510/107848812-c934df80-6df6-11eb-8a32-663d802f5d11.png)
+```julia
+8 / 6 ≈ 1.3333333 # a floating point number!
 
+8 // 6 == 4 // 3  # a fraction!
 
-![image](https://user-images.githubusercontent.com/6933510/107848846-0f8a3e80-6df7-11eb-818a-7271ecb9e127.png)
-
-We recommend that you leave the window open while you work on Julia code. It will continually look up documentation for anything you type!
-
-#### Help, I don't see the Live Docs!
-
-Try the following:
-
-🙋 **Are you viewing a static preview?** The Live Docs only work if you _run_ the notebook. If you are reading this on our course website, then click the button in the top right to run the notebook.
-
-🙋 **Is your screen too small?** Try resizing your window or zooming out.
+8 ÷ 6 == 1        # an integer!
+```
 """ |> hint
 
-# ╔═╡ 24090306-7395-4f2f-af31-34f7486f3945
-hint(md"""Check out this page for a refresher on basic Julia syntax:
-	
-	[Basic Julia Syntax](https://computationalthinking.mit.edu/Spring21/basic_syntax/)""")
+# ╔═╡ 649df270-ee24-11ea-397e-79c4355e38db
+hint(md"`num_rows, num_columns = size(M)`")
 
-# ╔═╡ aa1ff74a-4e78-4ef1-8b8d-3a60a168cf6d
-hint(md"""
-In [Section 1.1](https://computationalthinking.mit.edu/Spring21/week1/), we drew a red square on top of the image Philip with a simple command...
-""")
+# ╔═╡ 0cabed84-ee1e-11ea-11c1-7d8a4b4ad1af
+hint(md"`num_rows, num_columns = size(K)`")
 
-# ╔═╡ 50e2b0fb-b06d-4ac1-bdfb-eab833466736
-md"""
-This exercise can be quite difficult if you use a `for` loop or list comprehension. 
+# ╔═╡ 9def5f32-ee15-11ea-1f74-f7e6690f2efa
+hint(md"Can we just copy the 1D code? What is different in 2D?")
 
-Instead, you should use the [dot syntax](https://docs.julialang.org/en/v1/manual/functions/#man-vectorized) to apply a function _element-wise_ to an array. For example, this is how you get the square root of `3`:
-
-```
-sqrt(3)
-```
-
-and this is how you get the square roots of 1, 2 and 3:
-
-```
-sqrt.([1, 2, 3])
-```
-
-""" |> hint
-
-# ╔═╡ f6ef2c2e-ee07-11ea-13a8-2512e7d94426
-hint(md"`rand()` generates a (uniformly) random floating-point number between $0$ and $1$.")
-
-# ╔═╡ 8ce6ad06-819c-4af5-bed7-56ecc08c97be
+# ╔═╡ 57360a7a-edee-11ea-0c28-91463ece500d
 almost(text) = Markdown.MD(Markdown.Admonition("warning", "Almost there!", [text]))
 
-# ╔═╡ dfa40e89-03fc-4a7a-825e-92d67ee217b2
+# ╔═╡ dcb8324c-edee-11ea-17ff-375ff5078f43
 still_missing(text=md"Replace `missing` with your answer.") = Markdown.MD(Markdown.Admonition("warning", "Here we go!", [text]))
 
-# ╔═╡ 086ec1ff-b62d-4566-9973-5b2cc3353409
+# ╔═╡ 58af703c-edee-11ea-2963-f52e78fc2412
 keep_working(text=md"The answer is not quite right.") = Markdown.MD(Markdown.Admonition("danger", "Keep working on it!", [text]))
 
-# ╔═╡ 2f6fb3a6-bb5d-4c7a-9297-84dd4b16c7c3
-yays = [md"Fantastic!", md"Splendid!", md"Great!", md"Yay ❤", md"Great! 🎉", md"Well done!", md"Keep it up!", md"Good job!", md"Awesome!", md"You got the right answer!", md"Let's move on to the next section."]
+# ╔═╡ f3d00a9a-edf3-11ea-07b3-1db5c6d0b3cf
+yays = [md"Great!", md"Yay ❤", md"Great! 🎉", md"Well done!", md"Keep it up!", md"Good job!", md"Awesome!", md"You got the right answer!", md"Let's move on to the next exercise."]
 
-# ╔═╡ c22f688b-dc04-4a94-b541-fe06266c5446
+# ╔═╡ 5aa9dfb2-edee-11ea-3754-c368fb40637c
 correct(text=rand(yays)) = Markdown.MD(Markdown.Admonition("correct", "Got it!", [text]))
 
-# ╔═╡ 09102183-f9fb-4d89-b4f9-5d76af7b8e90
+# ╔═╡ f0c3e99d-9eb9-459e-917a-c2338af6683c
 let
-	result = get_red(RGB(0.2, 0.3, 0.4))
-	if ismissing(result)
-		still_missing()
-	elseif isnothing(result)
-		keep_working(md"Did you forget to write `return`?")
-	elseif result == 0.2
-		correct()
-	else
-		keep_working()
-	end
-end
-
-# ╔═╡ 63ac142e-6d9d-4109-9286-030a02c900b4
-let
-	test = [RGB(0.2, 0, 0)   RGB(0.6, 0, 0)]
-	result = get_reds(test)
+	result = gaussian_kernel_1D(5)
 	
 	if ismissing(result)
 		still_missing()
 	elseif isnothing(result)
 		keep_working(md"Did you forget to write `return`?")
-	elseif result == [ 0.2  0.6 ]
-		correct()
-	else
-		keep_working()
-	end
-end
-
-# ╔═╡ 80a4cb23-49c9-4446-a3ec-b2203128dc27
-let
-	result = invert(RGB(1.0, 0.5, 0.25)) # I chose these values because they can be represented exactly by Float64
-	shouldbe = RGB(0.0, 0.5, 0.75)
-	
-	if ismissing(result)
-		still_missing()
-	elseif isnothing(result)
-		keep_working(md"Did you forget to write `return`?")
-	elseif !(result isa AbstractRGB)
-		keep_working(md"You need to return a _color_, i.e. an object of type `RGB`. Use `RGB(r, g, b)` to create a color with channel values `r`, `g` and `b`.")
-	elseif !(result == shouldbe)
-		keep_working()
+	elseif !(result isa AbstractVector)
+		keep_working(md"The returned object is not a `Vector`.")
+	elseif size(result) != (11,)
+		hint(md"The returned vector has the wrong dimensions.")
+	elseif !(sum(result) ≈ 1.0)
+		keep_working(md"You need to _normalize_ the result.")
+	elseif gaussian_kernel_1D(3; σ=1) == gaussian_kernel_1D(3; σ=2)
+		keep_working(md"Use the keyword argument `σ` in your function.")
 	else
 		correct()
 	end
 end
 
-# ╔═╡ a6d9635b-85ed-4590-ad09-ca2903ea8f1d
-let
-	result = quantize(RGB(.297, .1, .0))
-
-	if ismissing(result)
-		still_missing()
-	elseif isnothing(result)
-		keep_working(md"Did you forget to write `return`?")
-	elseif !(result isa AbstractRGB)
-		keep_working(md"You need to return a _color_, i.e. an object of type `RGB`. Use `RGB(r, g, b)` to create a color with channel values `r`, `g` and `b`.")
-	elseif result != RGB(0.2, .1, .0)
-		keep_working()
-	else
-		correct()
-	end
-end
-
-# ╔═╡ 31ef3710-e4c9-4aa7-bd8f-c69cc9a977ee
-let
-	result = noisify(0.5, 0)
-
-	if ismissing(result)
-		still_missing()
-	elseif isnothing(result)
-		keep_working(md"Did you forget to write `return`?")
-	elseif result == 0.5
-		
-		results = [noisify(0.9, 0.1) for _ in 1:1000]
-		
-		if 0.8 ≤ minimum(results) < 0.81 && 0.99 ≤ maximum(results) ≤ 1
-			result = noisify(5, 3)
-			
-			if result == 1
-				correct()
-			else
-				keep_working(md"The result should be restricted to the range ``[0,1]``.")
-			end
-		else
-			keep_working()
-		end
-	else
-		keep_working(md"What should `noisify(0.5, 0)` be?")
-		correct()
-	end
-end
-
-# ╔═╡ ab3d1b70-88e8-4118-8d3e-601a8a68f72d
+# ╔═╡ 74d44e22-edee-11ea-09a0-69aa0aba3281
 not_defined(variable_name) = Markdown.MD(Markdown.Admonition("danger", "Oopsie!", [md"Make sure that you define a variable called **$(Markdown.Code(string(variable_name)))**"]))
 
-# ╔═╡ 397941fc-edee-11ea-33f2-5d46c759fbf7
-if !@isdefined(random_vect)
-	not_defined(:random_vect)
-elseif ismissing(random_vect)
-	still_missing()
-elseif !(random_vect isa Vector)
-	keep_working(md"`random_vect` should be a `Vector`.")
-elseif eltype(random_vect) != Float64
-	almost(md"""
-		You generated a vector of random integers. For the remaining exercises, we want a vector of `Float64` numbers. 
-		
-		The (optional) first argument to `rand` specifies the **type** of elements to generate. For example: `rand(Bool, 10)` generates 10 values that are either `true` or `false`. (Try it!)
-		""")
-elseif length(random_vect) != 10
-	keep_working(md"`random_vect` does not have the correct size.")
-elseif length(Set(random_vect)) != 10
-	keep_working(md"`random_vect` is not 'random enough'")
-else
-	correct(md"Well done! You can run your code again to generate a new vector!")
-end
-
-# ╔═╡ e0bfc973-2808-4f84-b065-fb3d05401e30
-if !@isdefined(my_sum)
-	not_defined(:my_sum)
+# ╔═╡ bcf98dfc-ee1b-11ea-21d0-c14439500971
+if !@isdefined(extend)
+	not_defined(:extend)
 else
 	let
-		result = my_sum([1,2,3])
+		result = extend([6,7],-10)
+
 		if ismissing(result)
 			still_missing()
 		elseif isnothing(result)
 			keep_working(md"Did you forget to write `return`?")
-		elseif result != 6
+		elseif result != 6 || extend([6,7],10) != 7
 			keep_working()
 		else
 			correct()
@@ -857,17 +684,25 @@ else
 	end
 end
 
-# ╔═╡ 38dc80a0-edef-11ea-10e9-615255a4588c
-if !@isdefined(mean)
-	not_defined(:mean)
+# ╔═╡ 7ffd14f8-ee1d-11ea-0343-b54fb0333aea
+if !@isdefined(convolve)
+	not_defined(:convolve)
 else
 	let
-		result = mean([1,2,3])
+		x = [1, 10, 100]
+		result = convolve(x, [0, 1, 1])
+		shouldbe = [11, 110, 200]
+		shouldbe2 = [2, 11, 110]
+
 		if ismissing(result)
 			still_missing()
 		elseif isnothing(result)
 			keep_working(md"Did you forget to write `return`?")
-		elseif result != 2
+		elseif !(result isa AbstractVector)
+			keep_working(md"The returned object is not a `Vector`.")
+		elseif size(result) != size(x)
+			keep_working(md"The returned vector has the wrong dimensions.")
+		elseif result != shouldbe && result != shouldbe2
 			keep_working()
 		else
 			correct()
@@ -875,119 +710,55 @@ else
 	end
 end
 
-# ╔═╡ 2b1ccaca-edee-11ea-34b0-c51659f844d0
-if !@isdefined(m)
-	not_defined(:m)
-elseif ismissing(m)
-	still_missing()
-elseif !(m isa Number)
-	keep_working(md"`m` should be a number.")
-elseif m != mean(random_vect)
-	keep_working()
-else
-	correct()
-end
-
-# ╔═╡ adf476d8-a334-4b35-81e8-cc3b37de1f28
-if !@isdefined(mean)
-	not_defined(:mean)
+# ╔═╡ d93fa3f6-c361-4dfd-a2ea-f38e682bcd6a
+if !@isdefined(box_blur_kernel)
+	not_defined(:box_blur_kernel)
 else
 	let
-		input = Float64[1,2,3]
-		result = demean(input)
+		result = box_blur_kernel(2)
 		
-		if input === result
-			almost(md"""
-			It looks like you **modified** `xs` inside the function.
+		if ismissing(result)
+			still_missing()
+		elseif isnothing(result)
+			keep_working(md"Did you forget to write `return`?")
+		elseif !(result isa AbstractVector)
+			keep_working(md"The returned object is not a `Vector`.")
+		elseif size(result) != (5,)
+			hint(md"The returned vector has the wrong dimensions.")
+		else
 			
-			It is preferable to avoid mutation inside functions, because you might want to use the original data again. For example, applying `demean` to a dataset of sensor readings would **modify** the original data, and the rest of your analysis would be erroneous.
+			x = [1, 10, 100]
+			result1 = box_blur(x, 2)
+			result2 = convolve(x, result)
 			
-			""")
-		elseif ismissing(result)
-			still_missing()
-		elseif isnothing(result)
-			keep_working(md"Did you forget to write `return`?")
-		elseif !(result isa AbstractVector) || length(result) != 3
-			keep_working(md"Return a vector of the same size as `xs`.")
-		elseif abs(sum(result) / 3) < 1e-10
-			correct()
-		else
-			keep_working()
-		end
-	end
-end
-
-# ╔═╡ e3394c8a-edf0-11ea-1bb8-619f7abb6881
-if !@isdefined(create_bar)
-	not_defined(:create_bar)
-else
-	let
-		result = create_bar()
-		if ismissing(result)
-			still_missing()
-		elseif isnothing(result)
-			keep_working(md"Did you forget to write `return`?")
-		elseif !(result isa Vector) || length(result) != 100
-			keep_working(md"The result should be a `Vector` with 100 elements.")
-		elseif result[[1,50,100]] != [0,1,0]
-			keep_working()
-		else
-			correct()
-		end
-	end
-end
-
-# ╔═╡ 4d0158d0-ee0d-11ea-17c3-c169d4284acb
-if !@isdefined(mean_color)
-	not_defined(:mean_color)
-else
-	let
-		input = reshape([RGB(1.0, 1.0, 1.0), RGB(1.0, 1.0, 0.0)], (2, 1))
-		
-		result = mean_color(input)
-		shouldbe = RGB(1.0, 1.0, 0.5)
-
-		if ismissing(result)
-			still_missing()
-		elseif isnothing(result)
-			keep_working(md"Did you forget to write `return`?")
-		elseif !(result isa AbstractRGB)
-			keep_working(md"You need to return a _color_, i.e. an object of type `RGB`. Use `RGB(r, g, b)` to create a color with channel values `r`, `g` and `b`.")
-		elseif !(result == shouldbe)
-			keep_working()
-		else
-			correct()
-		end
-	end
-end
-
-# ╔═╡ c905b73e-ee1a-11ea-2e36-23b8e73bfdb6
-if !@isdefined(quantize)
-	not_defined(:quantize)
-else
-	let
-		result = quantize(.3)
-
-		if ismissing(result)
-			still_missing()
-		elseif isnothing(result)
-			keep_working(md"Did you forget to write `return`?")
-		elseif result != .3
-			if quantize(0.35) == .3
-				almost(md"What should quantize(`0.2`) be?")
+			if result1 ≈ result2
+				correct()
 			else
 				keep_working()
 			end
+		end
+	end
+end
+
+# ╔═╡ efd1ceb4-ee1c-11ea-350e-f7e3ea059024
+if !@isdefined(extend)
+	not_defined(:extend)
+else
+	let
+		input = [42 37; 1 0]
+		result = extend(input, -2, -2)
+
+		if ismissing(result)
+			still_missing()
+		elseif isnothing(result)
+			keep_working(md"Did you forget to write `return`?")
+		elseif result != 42 || extend(input, -1, 3) != 37
+			keep_working()
 		else
 			correct()
 		end
 	end
 end
-
-# ╔═╡ 8cb0aee8-5774-4490-9b9e-ada93416c089
-todo(text) = HTML("""<div
-	style="background: rgb(220, 200, 255); padding: 2em; border-radius: 1em;"
-	><h1>TODO</h1>$(repr(MIME"text/html"(), text))</div>""")
 
 # ╔═╡ 115ded8c-ee0a-11ea-3493-89487315feb7
 bigbreak = html"<br><br><br><br><br>";
@@ -995,43 +766,13 @@ bigbreak = html"<br><br><br><br><br>";
 # ╔═╡ 54056a02-ee0a-11ea-101f-47feb6623bec
 bigbreak
 
-# ╔═╡ e083b3e8-ed61-11ea-2ec9-217820b0a1b4
-md"""
- $(bigbreak)
+# ╔═╡ a3067222-a83a-47b8-91c3-24ad78dd65c5
+bigbreak
 
-## **Exercise 2** - _Manipulating images_
+# ╔═╡ 27847dc4-ee0a-11ea-0651-ebbbb3cfd58c
+bigbreak
 
-In this exercise we will get familiar with matrices (2D arrays) in Julia, by manipulating images.
-Recall that in Julia images are matrices of `RGB` color objects.
-
-Let's load a picture of Philip again.
-"""
-
-# ╔═╡ f6cc03a0-ee07-11ea-17d8-013991514d42
-md"""
- $(bigbreak)
-
-## Exercise 3 - _More filters_
-
-In the previous exercises, we learned how to use Julia's _dot syntax_ to apply a function _element-wise_ to an array. In this exercise, we will use this to write more image filters, that you can then apply to your own webcam image!
-
-#### Exercise 3.1
-👉 Write a function `invert` that inverts a color, i.e. sends $(r, g, b)$ to $(1 - r, 1-g, 1-b)$.
-"""
-
-# ╔═╡ 4139ee66-ee0a-11ea-2282-15d63bcca8b8
-md"""
-$(bigbreak)
-### Camera input
-"""
-
-# ╔═╡ 87dabfd2-461e-4769-ad0f-132cb2370b88
-md"""
-$(bigbreak)
-### Write your own filter!
-"""
-
-# ╔═╡ 91f4778e-ee20-11ea-1b7e-2b0892bd3c0f
+# ╔═╡ 0001f782-ee0e-11ea-1fb4-2b5ef3d241e2
 bigbreak
 
 # ╔═╡ 5842895a-ee10-11ea-119d-81e4c4c8c53b
@@ -1241,8 +982,11 @@ function camera_input(;max_size=200, default_url="https://i.imgur.com/SUmi94P.pn
 """ |> HTML
 end
 
-# ╔═╡ 20402780-426b-4caa-af8f-ff1e7787b7f9
-@bind cam_data camera_input()
+# ╔═╡ 94c0798e-ee18-11ea-3212-1533753eabb6
+@bind gauss_raw_camera_data camera_input(;max_size=100)
+
+# ╔═╡ 1a0324de-ee19-11ea-1d4d-db37f4136ad3
+@bind sobel_raw_camera_data camera_input(;max_size=200)
 
 # ╔═╡ e15ad330-ee0d-11ea-25b6-1b1b3f3d7888
 
@@ -1279,32 +1023,17 @@ function process_raw_camera_data(raw_camera_data)
 	RGB.(reds, greens, blues)
 end
 
-# ╔═╡ ed9fb2ac-2680-42b7-9b00-591e45a5e105
-cam_image = process_raw_camera_data(cam_data)
+# ╔═╡ f461f5f2-ee18-11ea-3d03-95f57f9bf09e
+gauss_camera_image = process_raw_camera_data(gauss_raw_camera_data);
 
-# ╔═╡ d38c6958-9300-4f7a-89cf-95ca9e899c13
-mean_color(cam_image)
+# ╔═╡ a75701c4-ee18-11ea-2863-d3042e71a68b
+with_gaussian_blur(gauss_camera_image; σ=face_σ, l=face_l)
 
-# ╔═╡ 82f1e006-60fe-4ad1-b9cb-180fafdeb4da
-invert.(cam_image)
+# ╔═╡ 1ff6b5cc-ee19-11ea-2ca8-7f00c204f587
+sobel_camera_image = Gray.(process_raw_camera_data(sobel_raw_camera_data));
 
-# ╔═╡ 54c83589-b8c6-422a-b5e9-d8e0ee72a224
-quantize(cam_image)
-
-# ╔═╡ 18e781f8-66f3-4216-bc84-076a08f9f3fb
-noisify(cam_image, .5)
-
-# ╔═╡ ebf3193d-8c8d-4425-b252-45067a5851d9
-[
-	invert.(cam_image)      quantize(cam_image)
-	noisify(cam_image, .5)  custom_filter(cam_image)
-]
-
-# ╔═╡ 8917529e-fa7a-412b-8aea-54f92f6270fa
-custom_filter(cam_image)
-
-# ╔═╡ 83eb9ca0-ed68-11ea-0bc5-99a09c68f867
-md"_homework 1, version 9_"
+# ╔═╡ 1bf94c00-ee19-11ea-0e3c-e12bc68d8e28
+Gray.(with_sobel_edge_detect(sobel_camera_image))
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1312,12 +1041,14 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 HypertextLiteral = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
 ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 
 [compat]
 HypertextLiteral = "~0.9.4"
 ImageMagick = "~1.2.2"
 Images = "~0.25.2"
+OffsetArrays = "~1.11.0"
 PlutoUI = "~0.7.38"
 """
 
@@ -2196,164 +1927,134 @@ version = "17.4.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╟─83eb9ca0-ed68-11ea-0bc5-99a09c68f867
 # ╟─8ef13896-ed68-11ea-160b-3550eeabbd7d
 # ╟─ac8ff080-ed61-11ea-3650-d9df06123e1f
 # ╠═911ccbce-ed68-11ea-3606-0384e7580d7c
 # ╟─5f95e01a-ee0a-11ea-030c-9dba276aba92
 # ╠═65780f00-ed6b-11ea-1ecf-8b35523a7ac0
 # ╟─54056a02-ee0a-11ea-101f-47feb6623bec
-# ╟─540ccfcc-ee0a-11ea-15dc-4f8120063397
-# ╟─467856dc-eded-11ea-0f83-13d939021ef3
-# ╠═56ced344-eded-11ea-3e81-3936e9ad5777
-# ╟─ad6a33b0-eded-11ea-324c-cfabfd658b56
-# ╠═f51333a6-eded-11ea-34e6-bfbb3a69bcb0
-# ╟─b18e2c54-edf1-11ea-0cbf-85946d64b6a2
-# ╠═397941fc-edee-11ea-33f2-5d46c759fbf7
-# ╟─b1d5ca28-edf6-11ea-269e-75a9fb549f1d
-# ╟─5da8cbe8-eded-11ea-2e43-c5b7cc71e133
-# ╟─77adb065-bfd4-4680-9c2a-ad4d92689dbf
-# ╠═bd907ee1-5253-4cae-b5a5-267dac24362a
-# ╠═6640110a-d171-4b32-8d12-26979a36b718
-# ╟─e0bfc973-2808-4f84-b065-fb3d05401e30
-# ╟─24090306-7395-4f2f-af31-34f7486f3945
-# ╟─cf738088-eded-11ea-2915-61735c2aa990
-# ╠═0ffa8354-edee-11ea-2883-9d5bfea4a236
-# ╠═1f104ce4-ee0e-11ea-2029-1d9c817175af
-# ╟─38dc80a0-edef-11ea-10e9-615255a4588c
-# ╟─1f229ca4-edee-11ea-2c56-bb00cc6ea53c
-# ╠═2a391708-edee-11ea-124e-d14698171b68
-# ╠═bb0b959e-f6a0-4e42-a8aa-d105db1cba73
-# ╟─2b1ccaca-edee-11ea-34b0-c51659f844d0
-# ╟─e2863d4c-edef-11ea-1d67-332ddca03cc4
-# ╟─ea8d92f8-159c-4161-8c54-bab7bc00f290
-# ╠═ec5efe8c-edef-11ea-2c6f-afaaeb5bc50c
-# ╟─d6ddafdd-1a44-48c7-b49a-554073cdf331
-# ╟─29e10640-edf0-11ea-0398-17dbf4242de3
-# ╠═1267e961-5b75-4b55-8080-d45316a03b9b
-# ╠═38155b5a-edf0-11ea-3e3f-7163da7433fb
-# ╟─adf476d8-a334-4b35-81e8-cc3b37de1f28
-# ╟─a5f8bafe-edf0-11ea-0da3-3330861ae43a
-# ╠═b6b65b94-edf0-11ea-3686-fbff0ff53d08
-# ╠═4a5e9d2c-dd90-4bb0-9e31-3f5c834406b4
-# ╟─d862fb16-edf1-11ea-36ec-615d521e6bc0
-# ╟─aa1ff74a-4e78-4ef1-8b8d-3a60a168cf6d
-# ╟─e3394c8a-edf0-11ea-1bb8-619f7abb6881
-# ╟─e083b3e8-ed61-11ea-2ec9-217820b0a1b4
-# ╠═59414833-a108-4b1e-9a34-0f31dc907c6e
-# ╠═c5484572-ee05-11ea-0424-f37295c3072d
-# ╠═c8ecfe5c-ee05-11ea-322b-4b2714898831
-# ╟─e86ed944-ee05-11ea-3e0f-d70fc73b789c
-# ╠═6ccd8902-0dd9-4335-a11a-ee7f9a1a6c09
-# ╟─15088baa-c337-405d-8885-19a6e2bfd6aa
-# ╠═7ad4f6bc-588e-44ab-8ca9-c87cd1048442
-# ╟─a55bb5ca-600b-4aa0-b95f-7ece20845c9b
-# ╠═c5dc0cc8-9305-47e6-8b20-a9f8ef867799
-# ╠═de772e21-0bea-4fd2-868a-9a7d32550bc9
-# ╟─21bdc692-91ee-474d-ae98-455913a2342e
-# ╠═2ae3f379-96ce-435d-b863-deba4586ec71
-# ╟─c49ba901-d798-489a-963c-4cc113c7abfd
-# ╠═93451c37-77e1-4d4f-9788-c2a3da1401ee
-# ╟─f52e4914-2926-4a42-9e45-9caaace9a7db
-# ╠═a8b2270a-600c-4f83-939e-dc5ab35f4735
-# ╠═c320b39d-4cea-4fa1-b1ce-053c898a67a6
-# ╟─09102183-f9fb-4d89-b4f9-5d76af7b8e90
-# ╟─d8cf9bd5-dbf7-4841-acf9-eef7e7cabab3
-# ╠═ebe1d05c-f6aa-437d-83cb-df0ba30f20bf
-# ╠═c427554a-6f6a-43f1-b03b-f83239887cee
-# ╟─63ac142e-6d9d-4109-9286-030a02c900b4
-# ╟─50e2b0fb-b06d-4ac1-bdfb-eab833466736
-# ╟─4fd07e01-2f8b-4ec9-9f4f-8a9e5ff56fb6
-# ╠═97c15896-6d99-4292-b7d7-4fcd2353656f
-# ╠═cbb9bf41-4c21-42c7-b0e0-fc1ce29e0eb1
-# ╟─3f1a670b-44c2-4cab-909c-65f4ae9ed14b
-# ╠═21ba6e75-55a2-4614-9b5d-ea6378bf1d98
-# ╟─f7825c18-ff28-4e23-bf26-cc64f2f5049a
-# ╠═d994e178-78fd-46ab-a1bc-a31485423cad
-# ╠═354e20ae-9d78-4740-ba2a-20d1dcc766b7
-# ╠═2fedf27b-05c2-44c4-a6a7-2bf9a169ced9
-# ╠═ef2a6908-d0eb-4e9c-92c0-a6d8b5024dc3
-# ╟─c54ccdea-ee05-11ea-0365-23aaf053b7d7
-# ╠═f6898df6-ee07-11ea-2838-fde9bc739c11
-# ╠═5be9b144-ee0d-11ea-2a8d-8775de265a1d
-# ╟─4d0158d0-ee0d-11ea-17c3-c169d4284acb
-# ╟─5f6635b4-63ed-4a62-969c-bd4084a8202f
-# ╟─f6cc03a0-ee07-11ea-17d8-013991514d42
-# ╠═63e8d636-ee0b-11ea-173d-bd3327347d55
-# ╟─80a4cb23-49c9-4446-a3ec-b2203128dc27
-# ╟─2cc2f84e-ee0d-11ea-373b-e7ad3204bb00
-# ╠═b8f26960-ee0a-11ea-05b9-3f4bc1099050
-# ╠═5de3a22e-ee0b-11ea-230f-35df4ca3c96d
-# ╠═4e21e0c4-ee0b-11ea-3d65-b311ae3f98e9
-# ╠═6dbf67ce-ee0b-11ea-3b71-abc05a64dc43
-# ╟─846b1330-ee0b-11ea-3579-7d90fafd7290
-# ╠═943103e2-ee0b-11ea-33aa-75a8a1529931
-# ╟─55b138b7-19fb-4da1-9eb1-1e8304528251
-# ╟─f68d4a36-ee07-11ea-0832-0360530f102e
-# ╠═fbd1638d-8d7a-4d12-aff9-9c160cc3fd74
-# ╠═f6a655f8-ee07-11ea-13b6-43ca404ddfc7
-# ╟─c905b73e-ee1a-11ea-2e36-23b8e73bfdb6
-# ╟─7720740e-2d2b-47f7-98fd-500ed3eee479
-# ╠═90421bca-0804-4d6b-8bd0-3ddbd54cc5fe
-# ╠═b2329e4c-6204-453e-8998-2414b869b808
-# ╟─23fcd65f-0182-41f3-80ec-d85b05136c47
-# ╠═5055b74c-b98d-41fa-a0d8-cb36200d82cc
-# ╠═8db17b2b-0cf9-40ba-8f6f-2e53be7b6355
-# ╟─a8a597e0-a01c-40cd-9902-d56430afd938
-# ╟─f6b218c0-ee07-11ea-2adb-1968c4fd473a
-# ╠═04e6b486-ceb7-45fe-a6ca-733703f16357
-# ╟─a6d9635b-85ed-4590-ad09-ca2903ea8f1d
-# ╟─f6bf64da-ee07-11ea-3efb-05af01b14f67
-# ╠═13e9ec8d-f615-4833-b1cf-0153010ccb65
-# ╟─25dad7ce-ee0b-11ea-3e20-5f3019dd7fa3
-# ╠═9751586e-ee0c-11ea-0cbb-b7eda92977c9
-# ╟─f6d6c71a-ee07-11ea-2b63-d759af80707b
-# ╠═f38b198d-39cf-456f-a841-1ba08f206010
-# ╠═1ea53f41-b791-40e2-a0f8-04e13d856829
-# ╟─31ef3710-e4c9-4aa7-bd8f-c69cc9a977ee
-# ╟─f6ef2c2e-ee07-11ea-13a8-2512e7d94426
-# ╟─f6fc1312-ee07-11ea-39a0-299b67aee3d8
-# ╠═db4bad9f-df1c-4640-bb34-dd2fe9bdce18
-# ╟─0000b7f8-4c43-4dd8-8665-0dfe59e74c0a
-# ╠═774b4ce6-ee1b-11ea-2b48-e38ee25fc89b
-# ╠═7e4aeb70-ee1b-11ea-100f-1952ba66f80f
-# ╟─48de5bc2-72d3-11eb-3fd9-eff2b686cb75
-# ╠═8e848279-1b3e-4f32-8c0c-45693d12de96
-# ╟─f70823d2-ee07-11ea-2bb3-01425212aaf9
-# ╠═21a5885d-00ab-428b-96c3-c28c98c4ca6d
-# ╟─d896b7fd-20db-4aa9-bbcf-81b1cd44ec46
-# ╠═e70a84d4-ee0c-11ea-0640-bf78653ba102
-# ╠═ac15e0d0-ee0c-11ea-1eaf-d7f88b5df1d7
-# ╟─9604bc44-ee1b-11ea-28f8-7f7af8d0cbb2
-# ╟─f714699e-ee07-11ea-08b6-5f5169861b57
-# ╠═bdc2df7c-ee0c-11ea-2e9f-7d2c085617c1
-# ╟─4139ee66-ee0a-11ea-2282-15d63bcca8b8
-# ╠═20402780-426b-4caa-af8f-ff1e7787b7f9
-# ╟─ed9fb2ac-2680-42b7-9b00-591e45a5e105
-# ╟─e87e0d14-43a5-490d-84d9-b14ece472061
-# ╠═d38c6958-9300-4f7a-89cf-95ca9e899c13
-# ╠═82f1e006-60fe-4ad1-b9cb-180fafdeb4da
-# ╠═54c83589-b8c6-422a-b5e9-d8e0ee72a224
-# ╠═18e781f8-66f3-4216-bc84-076a08f9f3fb
-# ╠═ebf3193d-8c8d-4425-b252-45067a5851d9
-# ╟─87dabfd2-461e-4769-ad0f-132cb2370b88
-# ╠═8917529e-fa7a-412b-8aea-54f92f6270fa
-# ╠═ee5f21fb-1076-42b6-8926-8bbb6ed0ad67
-# ╠═9e5a08dd-332a-486b-94ab-15c49e72e522
-# ╟─91f4778e-ee20-11ea-1b7e-2b0892bd3c0f
+# ╟─e08781fa-ed61-11ea-13ae-91a49b5eb74a
+# ╟─a3067222-a83a-47b8-91c3-24ad78dd65c5
+# ╟─80108d80-ee09-11ea-0368-31546eb0d3cc
+# ╠═7fcd6230-ee09-11ea-314f-a542d00d582e
+# ╠═7fdb34dc-ee09-11ea-366b-ffe10d1aa845
+# ╟─7fe9153e-ee09-11ea-15b3-6f24fcc20734
+# ╠═01070e28-ee0f-11ea-1928-a7919d452bdd
+# ╟─ff70782e-e8d2-4281-9b24-d45c925f55e2
+# ╟─7522f81e-ee1c-11ea-35af-a17eb257ff1a
+# ╟─801d90c0-ee09-11ea-28d6-61b806de26dc
+# ╠═802bec56-ee09-11ea-043e-51cf1db02a34
+# ╟─b7f3994c-ee1b-11ea-211a-d144db8eafc2
+# ╠═803905b2-ee09-11ea-2d52-e77ff79693b0
+# ╠═80479d98-ee09-11ea-169e-d166eef65874
+# ╠═805691ce-ee09-11ea-053d-6d2e299ee123
+# ╟─bcf98dfc-ee1b-11ea-21d0-c14439500971
+# ╠═3492b164-7065-48e8-978b-6c96b965d376
+# ╠═02123165-2a0a-49a8-b7a9-458955523511
+# ╟─806e5766-ee0f-11ea-1efc-d753cd83d086
+# ╠═38da843a-ee0f-11ea-01df-bfa8b1317d36
+# ╟─9bde9f92-ee0f-11ea-27f8-ffef5fce2b3c
+# ╟─45c4da9a-ee0f-11ea-2c5b-1f6704559137
+# ╟─431ba330-0f72-416a-92e9-55f51ff3bcd1
+# ╠═5fdc5d0d-a52c-476e-b3b5-3b6364b706e4
+# ╟─e84c9cc2-e6e1-46f1-bf4e-9605da5e6f4a
+# ╠═807e5662-ee09-11ea-3005-21fdcc36b023
+# ╠═4f08ebe8-b781-4a32-a218-5ecd8338561d
+# ╟─808deca8-ee09-11ea-0ee3-1586fa1ce282
+# ╟─809f5330-ee09-11ea-0e5b-415044b6ac1f
+# ╠═e555a7e6-f11a-43ac-8218-6d832f0ce251
+# ╠═302f0842-453f-47bd-a74c-7942d8c96485
+# ╠═7d80a1ea-a0a9-41b2-9cfe-a334717ab2f4
+# ╟─ea435e58-ee11-11ea-3785-01af8dd72360
+# ╟─80ab64f4-ee09-11ea-29b4-498112ed0799
+# ╠═28e20950-ee0c-11ea-0e0a-b5f2e570b56e
+# ╟─32a07f1d-93cd-4bf3-bac1-91afa6bb88a6
+# ╟─5eea882c-ee13-11ea-0d56-af81ecd30a4a
+# ╠═93284f92-ee12-11ea-0342-833b1a30625c
+# ╟─cf73f9f8-ee12-11ea-39ae-0107e9107ef5
+# ╟─7ffd14f8-ee1d-11ea-0343-b54fb0333aea
+# ╟─fa463b71-5aa4-44a3-a67b-6b0776236243
+# ╠═8a7d3cfd-6f19-43f0-ae16-d5a236f148e7
+# ╟─a34d1ad8-3776-4bc4-93e5-72cfffc54f15
+# ╠═971a801d-9c46-417a-ad31-1144894fb4e1
+# ╟─5f13b1a5-8c7d-47c9-b96a-a09faf38fe5e
+# ╠═338b1c3f-f071-4f80-86c0-a82c17349828
+# ╠═bbe1a562-8d97-4112-a88a-c45c260f574d
+# ╟─d93fa3f6-c361-4dfd-a2ea-f38e682bcd6a
+# ╟─03f91a22-1c3e-4c42-9d78-1ee36851a120
+# ╟─48530f0d-49b4-4aec-8109-d69f1ef7f0ee
+# ╠═beb62fda-38a6-4528-a176-cfb726f4b5bd
+# ╟─f0d55cec-2e81-4cbb-b166-2cf4f2a0f43f
+# ╠═1c8b4658-ee0c-11ea-2ede-9b9ed7d3125e
+# ╟─f0c3e99d-9eb9-459e-917a-c2338af6683c
+# ╠═a6149507-d5ba-45c1-896a-3487070d36ec
+# ╟─f8bd22b8-ee14-11ea-04aa-ab16fd01826e
+# ╠═2a9dd06a-ee13-11ea-3f84-67bb309c77a8
+# ╠═b424e2aa-ee14-11ea-33fa-35491e0b9c9d
+# ╠═38eb92f6-ee13-11ea-14d7-a503ac04302e
+# ╠═bc1c20a4-ee14-11ea-3525-63c9fa78f089
+# ╠═24c21c7c-ee14-11ea-1512-677980db1288
+# ╟─ce24e486-df27-4780-bc57-d3bf7bee83bb
+# ╟─27847dc4-ee0a-11ea-0651-ebbbb3cfd58c
+# ╟─b01858b6-edf3-11ea-0826-938d33c19a43
+# ╟─7c1bc062-ee15-11ea-30b1-1b1e76520f13
+# ╠═7c2ec6c6-ee15-11ea-2d7d-0d9401a5e5d1
+# ╟─649df270-ee24-11ea-397e-79c4355e38db
+# ╟─9afc4dca-ee16-11ea-354f-1d827aaa61d2
+# ╠═cf6b05e2-ee16-11ea-3317-8919565cb56e
+# ╟─e3616062-ee27-11ea-04a9-b9ec60842a64
+# ╟─e5b6cd34-ee27-11ea-0d60-bd4796540b18
+# ╟─b4e98589-f221-4922-b11e-364d72d0788e
+# ╟─d06ea762-ee27-11ea-2e9c-1bcff86a3fe0
+# ╟─e1dc0622-ee16-11ea-274a-3b6ec9e15ab5
+# ╟─efd1ceb4-ee1c-11ea-350e-f7e3ea059024
+# ╟─4bbea325-35f8-4a51-bd66-153aba4aed96
+# ╠═c4f5a867-74ba-4106-91d4-195f6ae644d0
+# ╠═c825ebe2-511b-43ba-afdf-6226dbac48d2
+# ╠═2701ab0c-b91d-47fe-b36b-4e0036ecd4aa
+# ╠═84a48984-9adb-40ab-a1f1-1ab7b76c9a19
+# ╠═3cd535e4-ee26-11ea-2482-fb4ad43dda19
+# ╟─7c41f0ca-ee15-11ea-05fb-d97a836659af
+# ╠═8b96e0bc-ee15-11ea-11cd-cfecea7075a0
+# ╟─0cabed84-ee1e-11ea-11c1-7d8a4b4ad1af
+# ╟─5a5135c6-ee1e-11ea-05dc-eb0c683c2ce5
+# ╟─577c6daa-ee1e-11ea-1275-b7abc7a27d73
+# ╠═275a99c8-ee1e-11ea-0a76-93e3618c9588
+# ╠═42dfa206-ee1e-11ea-1fcd-21671042064c
+# ╟─6e53c2e6-ee1e-11ea-21bd-c9c05381be07
+# ╠═e7f8b41a-ee25-11ea-287a-e75d33fbd98b
+# ╟─8a335044-ee19-11ea-0255-b9391246d231
+# ╟─79eb0775-3582-446b-996a-0b64301394d0
+# ╠═f4d9fd6f-0f1b-4dec-ae68-e61550cee790
+# ╟─7c50ea80-ee15-11ea-328f-6b4e4ff20b7e
+# ╠═aad67fd0-ee15-11ea-00d4-274ec3cda3a3
+# ╟─9def5f32-ee15-11ea-1f74-f7e6690f2efa
+# ╟─8ae59674-ee18-11ea-3815-f50713d0fa08
+# ╟─94c0798e-ee18-11ea-3212-1533753eabb6
+# ╠═a75701c4-ee18-11ea-2863-d3042e71a68b
+# ╠═96146b16-79ea-401f-b8ba-e05663a18bd8
+# ╠═2cc745ce-e145-4428-af3b-926fba271b67
+# ╟─d5ffc6ab-156b-4d43-ac3d-1947d0176e7f
+# ╟─f461f5f2-ee18-11ea-3d03-95f57f9bf09e
+# ╟─7c6642a6-ee15-11ea-0526-a1aac4286cdd
+# ╠═9eeb876c-ee15-11ea-1794-d3ea79f47b75
+# ╠═1a0324de-ee19-11ea-1d4d-db37f4136ad3
+# ╠═1bf94c00-ee19-11ea-0e3c-e12bc68d8e28
+# ╟─1ff6b5cc-ee19-11ea-2ca8-7f00c204f587
+# ╟─0001f782-ee0e-11ea-1fb4-2b5ef3d241e2
 # ╟─8ffe16ce-ee20-11ea-18bd-15640f94b839
 # ╟─5842895a-ee10-11ea-119d-81e4c4c8c53b
-# ╟─756d150a-b7bf-4bf5-b372-5b0efa80d987
-# ╟─4bc94bec-da39-4f8a-82ee-9953ed73b6a4
-# ╟─8ce6ad06-819c-4af5-bed7-56ecc08c97be
-# ╟─dfa40e89-03fc-4a7a-825e-92d67ee217b2
-# ╟─086ec1ff-b62d-4566-9973-5b2cc3353409
-# ╟─2f6fb3a6-bb5d-4c7a-9297-84dd4b16c7c3
-# ╟─c22f688b-dc04-4a94-b541-fe06266c5446
-# ╟─ab3d1b70-88e8-4118-8d3e-601a8a68f72d
-# ╟─8cb0aee8-5774-4490-9b9e-ada93416c089
+# ╟─2d9f3ae4-9e4c-49ce-aab0-5f87aba85c3e
+# ╟─5516c800-edee-11ea-12cf-3f8c082ef0ef
+# ╟─57360a7a-edee-11ea-0c28-91463ece500d
+# ╟─dcb8324c-edee-11ea-17ff-375ff5078f43
+# ╟─58af703c-edee-11ea-2963-f52e78fc2412
+# ╟─f3d00a9a-edf3-11ea-07b3-1db5c6d0b3cf
+# ╟─5aa9dfb2-edee-11ea-3754-c368fb40637c
+# ╟─74d44e22-edee-11ea-09a0-69aa0aba3281
 # ╟─115ded8c-ee0a-11ea-3493-89487315feb7
 # ╟─dfb7c6be-ee0d-11ea-194e-9758857f7b20
 # ╟─e15ad330-ee0d-11ea-25b6-1b1b3f3d7888
-# ╟─83eb9ca0-ed68-11ea-0bc5-99a09c68f867
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
