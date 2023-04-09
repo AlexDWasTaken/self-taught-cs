@@ -296,8 +296,20 @@ md"""
 
 # ╔═╡ 7c2ec6c6-ee15-11ea-2d7d-0d9401a5e5d1
 function extend(M::AbstractMatrix, i, j)
-	
-	return missing
+	num_rows, num_columns = size(M)
+	i_out = i
+	j_out = j
+	if i <= 1
+		i_out = 1
+	elseif i >= num_rows
+		i_out = num_rows
+	end
+	if j <= 1
+		j_out = 1
+	elseif j >= num_columns
+		j_out = num_columns
+	end
+	return M[i_out, j_out]
 end
 
 # ╔═╡ 803905b2-ee09-11ea-2d52-e77ff79693b0
@@ -423,8 +435,23 @@ md"""
 
 # ╔═╡ 8b96e0bc-ee15-11ea-11cd-cfecea7075a0
 function convolve(M::AbstractMatrix, K::AbstractMatrix)
-	
-	return missing
+	num_rows, num_columns = size(K)
+	lᵢ = (num_rows - 1) ÷ 2
+	lⱼ = (num_columns - 1) ÷ 2
+	M_rows, M_columns = size(M)
+	offset_k = OffsetArray(K, -lᵢ:lᵢ, -lⱼ:lⱼ)
+	convolved = [
+		sum([
+				extend(M, x + i, y + j) * offset_k[-i, -j]
+				for 
+					i in -lᵢ:lᵢ,
+					j in -lⱼ:lⱼ
+			])
+		for 
+			x in 1:M_rows,
+			y in 1:M_columns
+	]
+	return convolved
 end
 
 # ╔═╡ 93284f92-ee12-11ea-0342-833b1a30625c
@@ -527,11 +554,22 @@ md"""
 👉 Write a function that applies a **Gaussian blur** to an image. Use your previous functions, and add cells to write helper functions as needed!
 """
 
+# ╔═╡ afcd13c0-23a3-4b2e-a611-1ad7b80fc426
+function gaussian_kernel_2D(n; σ = 1)
+	kernal = [gauss(i, j; σ = σ) for i in -n:n, j in -n:n]
+	kernal = kernal ./ sum(kernal)
+	return kernal
+end
+
 # ╔═╡ aad67fd0-ee15-11ea-00d4-274ec3cda3a3
 function with_gaussian_blur(image; σ=3, l=5)
-	
-	return missing
+	kernel = gaussian_kernel_2D((l - 1) ÷ 2; σ = σ)
+	blurred = convolve(image, kernel)
+	return blurred
 end
+
+# ╔═╡ a2083345-8865-4fad-a917-84f97e75240c
+(with_gaussian_blur(philip; σ=1, l=50) - with_gaussian_blur(philip; σ=6, l=50))
 
 # ╔═╡ 8ae59674-ee18-11ea-3815-f50713d0fa08
 md"_Let's make it interactive. 💫_"
@@ -581,8 +619,19 @@ Use your previous functions, and add cells to write helper functions as needed!
 
 # ╔═╡ 9eeb876c-ee15-11ea-1794-d3ea79f47b75
 function with_sobel_edge_detect(image)
+	Gx = [
+		1 0 -1
+		2 0 -2
+		1 0 -1
+	]
+	Gy = [
+		1 2 1
+		0 0 0
+		-1 -2 -1
+	]
+	detected = .√(convolve(image, Gx).^2 + convolve(image, Gy).^2)
 	
-	return missing
+	return detected
 end
 
 # ╔═╡ 8ffe16ce-ee20-11ea-18bd-15640f94b839
@@ -2028,7 +2077,9 @@ version = "17.4.0+0"
 # ╟─79eb0775-3582-446b-996a-0b64301394d0
 # ╠═f4d9fd6f-0f1b-4dec-ae68-e61550cee790
 # ╟─7c50ea80-ee15-11ea-328f-6b4e4ff20b7e
+# ╠═afcd13c0-23a3-4b2e-a611-1ad7b80fc426
 # ╠═aad67fd0-ee15-11ea-00d4-274ec3cda3a3
+# ╠═a2083345-8865-4fad-a917-84f97e75240c
 # ╟─9def5f32-ee15-11ea-1f74-f7e6690f2efa
 # ╟─8ae59674-ee18-11ea-3815-f50713d0fa08
 # ╟─94c0798e-ee18-11ea-3212-1533753eabb6
