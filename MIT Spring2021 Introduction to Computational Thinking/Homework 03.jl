@@ -812,7 +812,15 @@ If the same n-gram occurs multiple times (e.g. "said Emma laughing"), then the l
 function completion_cache(grams)
 	cache = Dict()
 
-	# your code here
+	for gram in grams
+		key = gram[1:end-1]
+		if haskey(cache, key)
+			cache[key] += 1
+		else
+			cache[key] = 1
+		end
+	end
+	
 	
 	cache
 end
