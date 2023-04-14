@@ -8,4 +8,4 @@ This repository contains homework for publicly-available courses offered by univ
 
 Process:
 
-- [ ] [learning] Introduction to Computational Thinking (MIT)
+- [ ] [Halfway!] Introduction to Computational Thinking (MIT)
