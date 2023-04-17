@@ -29,6 +29,9 @@ begin
 	using PlutoUI, Plots
 end
 
+# ╔═╡ 0a0231a5-ea82-4f4b-8edb-f26bf16f2532
+using BenchmarkTools
+
 # ╔═╡ eadb174e-2c1d-48c8-9de2-99cdc2b38d32
 md"_homework 6, version 5_"
 
@@ -438,7 +441,7 @@ As you vary $p$, what do you observe? Does that make sense?
 """
 
 # ╔═╡ d5b29c53-baff-4529-b2c1-776afe000d38
-@bind p Slider( 0.01 : 0.01 : 1 , show_value = true)
+@bind p Slider( 0.01 : 0.01 : 1 , default = 0.25, show_value = true)
 
 # ╔═╡ 9a92eba4-ad68-4c53-a242-734718aeb3f1
 @bind N Slider(1:1:10000, default=20, show_value = true)
@@ -532,7 +535,6 @@ Ps = let
 	p = 0.25
 	P(n) = n == 1 ? p : p * (1-p)^(n-1)
 	[P(n) for n in 1:50]
-	# your code here
 end
 
 # ╔═╡ dd80b2eb-e4c3-4b2f-ad5c-526a241ac5e6
@@ -643,7 +645,7 @@ md"""
 # ╔═╡ 1ae91530-c77e-4d92-9ad3-c969bc7e1fa8
 md"""
 ```math
-C_n := \sum_{k=1}^n P_k = my \cdot answer \cdot here
+C_n := \sum_{k=1}^n P_k = 1 - (1 - p) ^n
 ```
 """
 
@@ -658,7 +660,7 @@ md"""
 # ╔═╡ 16b4e98c-4ae7-4145-addf-f43a0a96ec82
 md"""
 ```math
-n(r,p) = my \cdot answer \cdot here
+n(r,p) = int( \log_{1-p} ({1-r}) ) + 1
 ```
 """
 
@@ -670,13 +672,8 @@ md"""
 """
 
 # ╔═╡ 47d56992-8c54-11eb-302a-eb3153978d26
-function geometric_bin(u::Real, p::Real)
-	Ps = let 
-		P(n) = n == 1 ? p : p * (1-p)^(n-1)
-		[P(n) for n in 1:100]
-	end
-	floor
-	return missing
+function geometric_bin(r::Real, p::Real)
+	return floor(log(1-p, 1-r)) + 1
 end
 
 # ╔═╡ adfb343d-beb8-4576-9f2a-d53404cee42b
@@ -697,10 +694,17 @@ md"""
 """
 
 # ╔═╡ 1d007d99-2526-4c19-9c96-3fad1750670e
+big_sample = [geometric_fast(10^(-10)) for _ in 1:10_000]
 
+# ╔═╡ ff82bcf9-b32a-4b97-a06c-cbbf7128dae0
+with_terminal() do
+	@btime [geometric_fast(10^(-10)) for _ in 1:10_000]
+end
 
 # ╔═╡ c37bbb1f-8f5e-4097-9104-43ef65aa1cbd
-
+let
+	histogram(big_sample, alpha = 0.5, leg = false, color = :red)
+end
 
 # ╔═╡ 79eb5e14-8c54-11eb-3c8c-dfeba16305b2
 md"""
@@ -723,8 +727,23 @@ md"""
 
 # ╔═╡ 2270e6ba-8c5e-11eb-3600-615519daa5e0
 function atmosphere(p::Real, y0::Real, N::Integer)
+	height = zeros(Int, N)
+	height[1] = y0
+	for i in 2:N
+		if rand() > p
+			y0 = y0 + 1
+		else
+			if y0 == 1
+				height[i] = y0
+				continue
+			else
+				y0 = y0 - 1
+			end
+		end
+		height[i] = y0
+	end
 	
-	return missing
+	return height
 end
 
 # ╔═╡ 225bbcbd-0628-4151-954e-9a85d1020fd9
@@ -740,13 +759,15 @@ Let's simulate it for $10^7$ time steps with $x_0 = 10$ and $p=0.55$.
 """
 
 # ╔═╡ deb5fbfb-1e03-42ce-a6d6-c8d3edd89a9a
-
+data = atmosphere(0.55, 10, 10^7)
 
 # ╔═╡ 8517f92b-d4d3-46b5-9b9a-e609175b6481
-
+heights, probabilities = probability_distribution(data)
 
 # ╔═╡ c1e3f066-5e12-4018-9fb2-4e7fc13172ba
-
+let
+	bar(heights, probabilities)
+end
 
 # ╔═╡ 1dc68e2e-8c5e-11eb-3486-454d58ac9c87
 md"""
@@ -1057,10 +1078,12 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 
 [compat]
+BenchmarkTools = "~1.3.2"
 Plots = "~1.29.1"
 PlutoUI = "~0.7.48"
 """
@@ -1090,6 +1113,12 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+
+[[BenchmarkTools]]
+deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "d9a9701b899b30332bbcb3e1679c41cce81fb0e8"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.3.2"
 
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1645,6 +1674,10 @@ version = "1.3.0"
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[[Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+
 [[Qt5Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "xkbcommon_jll"]
 git-tree-sha1 = "0c03844e2231e12fda4d0086fd7cbe4098ee8dc5"
@@ -2171,6 +2204,8 @@ version = "1.4.1+0"
 # ╠═b3b11113-2f0c-45d2-a14e-011a61ae8e9b
 # ╟─fc681dde-8c52-11eb-07fa-7d0ef9f22e93
 # ╠═1d007d99-2526-4c19-9c96-3fad1750670e
+# ╠═0a0231a5-ea82-4f4b-8edb-f26bf16f2532
+# ╠═ff82bcf9-b32a-4b97-a06c-cbbf7128dae0
 # ╠═c37bbb1f-8f5e-4097-9104-43ef65aa1cbd
 # ╟─94053b41-4a06-435d-a91a-9dfa9655937c
 # ╟─79eb5e14-8c54-11eb-3c8c-dfeba16305b2
