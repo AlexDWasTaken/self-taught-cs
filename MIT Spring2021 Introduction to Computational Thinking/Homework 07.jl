@@ -48,7 +48,7 @@ Feel free to ask questions!
 # ╔═╡ 095cbf46-0403-11eb-0c37-35de9562cebc
 # edit the code below to set your name and kerberos ID (i.e. email without @mit.edu)
 
-student = (name = "Jazzy Doe", kerberos_id = "jazz")
+student = (name = "AlexD", kerberos_id = "NOTHING")
 
 # you might need to wait until all other cells in this notebook have completed running. 
 # scroll around the page to see what's up
@@ -97,7 +97,7 @@ We have just defined a new type `InfectionStatus`, as well as names `S`, `I` and
 """
 
 # ╔═╡ 7f4e121c-041d-11eb-0dff-cd0cbfdfd606
-test_status = missing
+test_status = S
 
 # ╔═╡ 7f744644-041d-11eb-08a0-3719cc0adeb7
 md"""
@@ -105,7 +105,7 @@ md"""
 """
 
 # ╔═╡ 88c53208-041d-11eb-3b1e-31b57ba99f05
-
+typeof(test_status)
 
 # ╔═╡ 847d0fc2-041d-11eb-2864-79066e223b45
 md"""
@@ -113,7 +113,7 @@ md"""
 """
 
 # ╔═╡ f2792ff5-b0b6-4fcd-94aa-0b6ef048f6ab
-
+Integer.((S, I, R))
 
 # ╔═╡ 860790fc-0403-11eb-2f2e-355f77dcc7af
 md"""
@@ -123,9 +123,14 @@ For each agent we want to keep track of its infection status and the number of *
 """
 
 # ╔═╡ ae4ac4b4-041f-11eb-14f5-1bcde35d18f2
-mutable struct Agent
-	status::InfectionStatus
-	num_infected::Int64
+begin
+	mutable struct Agent
+		status::InfectionStatus
+		num_infected::Int64
+	end
+	function Agent()
+		Agent(S, 0)
+	end
 end
 
 # ╔═╡ ae70625a-041f-11eb-3082-0753419d6d57
@@ -136,7 +141,7 @@ When you define a new type like this, Julia automatically defines one or more **
 """
 
 # ╔═╡ 60a8b708-04c8-11eb-37b1-3daec644ac90
-
+methods(Agent)
 
 # ╔═╡ 189cae1e-0424-11eb-2666-65bf297d8bdd
 md"""
@@ -144,7 +149,7 @@ md"""
 """
 
 # ╔═╡ 18d308c4-0424-11eb-176d-49feec6889cf
-test_agent = missing
+test_agent = Agent(S, 0)
 
 # ╔═╡ 190deebc-0424-11eb-19fe-615997093e14
 md"""
@@ -169,6 +174,13 @@ md"""
 # ╔═╡ 98beb336-0425-11eb-3886-4f8cfd210288
 function set_status!(agent::Agent, new_status::InfectionStatus)
 	# your code here
+	agent.status = new_status
+end
+
+# ╔═╡ 1d7b5038-5dca-4b30-ba5d-65a0993f7420
+function set_num_infected!(agent::Agent, new_num::Int)
+	# your code here
+	agent.num_infected = new_num
 end
 
 # ╔═╡ 866299e8-0403-11eb-085d-2b93459cc141
@@ -180,13 +192,13 @@ md"""
 # ╔═╡ 9a837b52-0425-11eb-231f-a74405ff6e23
 function is_susceptible(agent::Agent)
 	
-	return missing
+	return agent.status == S
 end
 
 # ╔═╡ a8dd5cae-0425-11eb-119c-bfcbf832d695
 function is_infected(agent::Agent)
 	
-	return missing
+	return agent.status == I
 end
 
 # ╔═╡ 8692bf42-0403-11eb-191f-b7d08895274f
@@ -198,8 +210,9 @@ md"""
 
 # ╔═╡ 7946d83a-04a0-11eb-224b-2b315e87bc84
 function generate_agents(N::Integer)
-	
-	return missing
+	Agents = [Agent() for i in 1:N]
+	set_status!(Agents[rand(1:N)], I)
+	return Agents
 end
 
 # ╔═╡ 488771e2-049f-11eb-3b0a-0de260457731
@@ -235,8 +248,17 @@ $(html"<span id=interactfunction></span>")
 
 # ╔═╡ 9d0f9564-e393-401f-9dd5-affa4405a9c6
 function interact!(agent::Agent, source::Agent, infection::InfectionRecovery)
-	
-	# your code here
+	if is_susceptible(agent) && is_infected(source)
+		if rand() < infection.p_infection
+			set_status!(agent, I)
+			old_num = source.num_infected
+			set_num_infected!(source, old_num + 1)
+		end
+	elseif is_infected(agent)
+		if rand() < infection.p_recovery
+			set_status!(agent, R)
+		end
+	end
 end
 
 # ╔═╡ b21475c6-04ac-11eb-1366-f3b5e967402d
@@ -277,7 +299,17 @@ You should not use any global variables inside the functions: Each function must
 
 # ╔═╡ 2ade2694-0425-11eb-2fb2-390da43d9695
 function step!(agents::Vector{Agent}, infection::InfectionRecovery)
-	
+	l = length(agents)
+	@assert l>2 "More agent needed."
+	agent_index = rand(1:l)
+	source_index = rand(1:l)
+	while agent_index == source_index
+		agent_index = rand(1:l)
+		source_index = rand(1:l)
+	end
+	interact!(agents[agent_index], agents[source_index], infection)
+
+	return agents
 end
 
 # ╔═╡ 955321de-0403-11eb-04ce-fb1670dfbb9e
@@ -287,7 +319,11 @@ md"""
 
 # ╔═╡ 46133a74-04b1-11eb-0b46-0bc74e564680
 function sweep!(agents::Vector{Agent}, infection::AbstractInfection)
-	
+	N = length(agents)
+	for i in 1:N
+		step!(agents, infection)
+	end
+	return agents
 end
 
 # ╔═╡ 95771ce2-0403-11eb-3056-f1dc3a8b7ec3
@@ -307,8 +343,16 @@ _Feel free to store the counts in a different way, as long as the return type is
 
 # ╔═╡ 887d27fc-04bc-11eb-0ab9-eb95ef9607f8
 function simulation(N::Integer, T::Integer, infection::AbstractInfection)
-
-	return (S=missing, I=missing, R=missing)
+	agents = generate_agents(N)
+	S_counts, I_counts, R_counts = [], [], []
+	for i in 1:T
+		agents = sweep!(agents, infection)
+		push!(S_counts, count(agent::Agent -> agent.status == S, agents))
+		push!(I_counts, count(agent::Agent -> agent.status == I, agents))
+		push!(R_counts, count(agent::Agent -> agent.status == R, agents))
+	end
+		
+	return (S=S_counts, I=I_counts, R=R_counts)
 end
 
 # ╔═╡ b92f1cec-04ae-11eb-0072-3535d1118494
@@ -353,8 +397,14 @@ function repeat_simulations(N, T, infection, num_simulations)
 	end
 end
 
+# ╔═╡ 11849764-3180-4542-a74e-87c27725d35e
+@bind pi Slider(0.001:0.001:0.5; default = 0.02, show_value = true)
+
+# ╔═╡ 22d77ca8-f73f-41d8-8178-d68659b064da
+@bind pr Slider(0.0001:0.0001:0.005; default = 0.002, show_value = true)
+
 # ╔═╡ 80c2cd88-04b1-11eb-326e-0120a39405ea
-simulations = repeat_simulations(100, 1000, InfectionRecovery(0.02, 0.002), 20)
+simulations = repeat_simulations(100, 1000, InfectionRecovery(pi, pr), 20)
 
 # ╔═╡ 80e6f1e0-04b1-11eb-0d4e-475f1d80c2bb
 md"""
@@ -368,6 +418,14 @@ let
 	for sim in simulations
 		plot!(p, 1:1000, sim.I, alpha=.5, label=nothing)
 	end
+
+	sum_I = simulations[1].I
+	for sim in simulations
+		sum_I = sum_I .+ sim.I
+	end
+	average_I = sum_I ./ length(simulations)
+
+	plot!(p, 1:1000, average_I, alpha=1, lw = 3, label="average I")
 	
 	p
 end
@@ -382,7 +440,30 @@ function sir_mean_plot(simulations::Vector{<:NamedTuple})
 	# you might need T for this function, here's a trick to get it:
 	T = length(first(simulations).S)
 	
-	return missing
+	sum_I = simulations[1].I
+	for sim in simulations
+		sum_I = sum_I .+ sim.I
+	end
+	average_I = sum_I ./ T
+
+	sum_R = simulations[1].R
+	for sim in simulations
+		sum_R = sum_R .+ sim.R
+	end
+	average_R = sum_R ./ T
+	
+	sum_S = simulations[1].S
+	for sim in simulations
+		sum_S = sum_S .+ sim.S
+	end
+	average_S = sum_S ./ T
+
+	p = plot()
+	plot!(p, 1:1000, average_I, alpha=1, lw = 3, label="average I")
+	plot!(p, 1:1000, average_R, alpha=1, lw = 3, label="average R")
+	plot!(p, 1:1000, average_S, alpha=1, lw = 3, label="average S")
+	
+	return p
 end
 
 # ╔═╡ 7f635722-04d0-11eb-3209-4b603c9e843c
@@ -408,7 +489,9 @@ md"""
 """
 
 # ╔═╡ 1c6aa208-04d1-11eb-0b87-cf429e6ff6d0
-
+md"""
+written above.
+"""
 
 # ╔═╡ 95eb9f88-0403-11eb-155b-7b2d3a07cff0
 md"""
@@ -421,9 +504,10 @@ This should confirm that the distribution of $I$ at each step is pretty wide!
 function sir_mean_error_plot(simulations::Vector{<:NamedTuple})
 	# you might need T for this function, here's a trick to get it:
 	T = length(first(simulations).S)
-	
-	return missing
 end
+
+# ╔═╡ 24a15056-de95-4a05-add8-d25ce35031cd
+
 
 # ╔═╡ 9611ca24-0403-11eb-3582-b7e3bb243e62
 md"""
@@ -1725,6 +1809,7 @@ version = "1.4.1+0"
 # ╠═82f2580a-04c8-11eb-1eea-bdb4e50eee3b
 # ╟─8631a536-0403-11eb-0379-bb2e56927727
 # ╠═98beb336-0425-11eb-3886-4f8cfd210288
+# ╠═1d7b5038-5dca-4b30-ba5d-65a0993f7420
 # ╟─7c515a7a-04d5-11eb-0f36-4fcebff709d5
 # ╟─866299e8-0403-11eb-085d-2b93459cc141
 # ╠═9a837b52-0425-11eb-231f-a74405ff6e23
@@ -1757,6 +1842,8 @@ version = "1.4.1+0"
 # ╟─bf6fd176-04cc-11eb-008a-2fb6ff70a9cb
 # ╠═38b1aa5a-04cf-11eb-11a2-930741fc9076
 # ╠═80c2cd88-04b1-11eb-326e-0120a39405ea
+# ╠═11849764-3180-4542-a74e-87c27725d35e
+# ╠═22d77ca8-f73f-41d8-8178-d68659b064da
 # ╟─80e6f1e0-04b1-11eb-0d4e-475f1d80c2bb
 # ╠═9cd2bb00-04b1-11eb-1d83-a703907141a7
 # ╟─9cf9080a-04b1-11eb-12a0-17013f2d37f5
@@ -1768,6 +1855,7 @@ version = "1.4.1+0"
 # ╠═1c6aa208-04d1-11eb-0b87-cf429e6ff6d0
 # ╟─95eb9f88-0403-11eb-155b-7b2d3a07cff0
 # ╠═287ee7aa-0435-11eb-0ca3-951dbbe69404
+# ╠═24a15056-de95-4a05-add8-d25ce35031cd
 # ╟─9611ca24-0403-11eb-3582-b7e3bb243e62
 # ╠═26e2978e-0435-11eb-0d61-25f552d2771e
 # ╟─9635c944-0403-11eb-3982-4df509f6a556
