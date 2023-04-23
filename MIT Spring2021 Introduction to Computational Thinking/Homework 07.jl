@@ -444,19 +444,19 @@ function sir_mean_plot(simulations::Vector{<:NamedTuple})
 	for sim in simulations
 		sum_I = sum_I .+ sim.I
 	end
-	average_I = sum_I ./ T
+	average_I = sum_I ./ length(simulations)
 
 	sum_R = simulations[1].R
 	for sim in simulations
 		sum_R = sum_R .+ sim.R
 	end
-	average_R = sum_R ./ T
+	average_R = sum_R ./ length(simulations)
 	
 	sum_S = simulations[1].S
 	for sim in simulations
 		sum_S = sum_S .+ sim.S
 	end
-	average_S = sum_S ./ T
+	average_S = sum_S ./ length(simulations)
 
 	p = plot()
 	plot!(p, 1:1000, average_I, alpha=1, lw = 3, label="average I")
@@ -467,9 +467,14 @@ function sir_mean_plot(simulations::Vector{<:NamedTuple})
 end
 
 # ╔═╡ 7f635722-04d0-11eb-3209-4b603c9e843c
+# ╠═╡ disabled = true
+#=╠═╡
 sir_mean_plot(simulations)
+  ╠═╡ =#
 
 # ╔═╡ a4c9ccdc-12ca-11eb-072f-e34595520548
+# ╠═╡ disabled = true
+#=╠═╡
 let
 	T = length(first(simulations).S)
 	
@@ -482,6 +487,7 @@ let
 	R=round.(sum(all_R_counts) ./ length(simulations) ./ 100, digits=4))
 	
 end
+  ╠═╡ =#
 
 # ╔═╡ dfb99ace-04cf-11eb-0739-7d694c837d59
 md"""
@@ -500,14 +506,48 @@ md"""
 This should confirm that the distribution of $I$ at each step is pretty wide!
 """
 
+# ╔═╡ 61b96512-a85c-42e2-b9aa-b494a9cc28f5
+function std(datas, average)
+	return [sqrt(sum( (data .- average).^2 ) / length(data)) for data in datas]
+end
+
 # ╔═╡ 287ee7aa-0435-11eb-0ca3-951dbbe69404
 function sir_mean_error_plot(simulations::Vector{<:NamedTuple})
 	# you might need T for this function, here's a trick to get it:
 	T = length(first(simulations).S)
+	
+	sum_I = simulations[1].I
+	for sim in simulations
+		sum_I = sum_I .+ sim.I
+	end
+	average_I = sum_I ./ length(simulations)
+	std_I = std(map(result -> result.I, simulations), average_I)
+	not_that_std_I = sum(std_I) / length(std_I)
+
+	sum_R = simulations[1].R
+	for sim in simulations
+		sum_R = sum_R .+ sim.R
+	end
+	average_R = sum_R ./ length(simulations)
+	std_R = std(map(result -> result.R, simulations), average_R)
+	
+	sum_S = simulations[1].S
+	for sim in simulations
+		sum_S = sum_S .+ sim.S
+	end
+	average_S = sum_S ./ length(simulations)
+	std_S = std(map(result -> result.S, simulations), average_S)
+
+	p = plot()
+	plot!(p, 1:1000, average_I, alpha=.5, lw = 3, label="average I", yerr = not_that_std_I)
+	plot!(p, 1:1000, average_R, alpha=1, lw = 3, label="average R")
+	plot!(p, 1:1000, average_S, alpha=1, lw = 3, label="average S")
+	
+	return p
 end
 
 # ╔═╡ 24a15056-de95-4a05-add8-d25ce35031cd
-
+sir_mean_error_plot(simulations)
 
 # ╔═╡ 9611ca24-0403-11eb-3582-b7e3bb243e62
 md"""
@@ -1854,6 +1894,7 @@ version = "1.4.1+0"
 # ╟─dfb99ace-04cf-11eb-0739-7d694c837d59
 # ╠═1c6aa208-04d1-11eb-0b87-cf429e6ff6d0
 # ╟─95eb9f88-0403-11eb-155b-7b2d3a07cff0
+# ╠═61b96512-a85c-42e2-b9aa-b494a9cc28f5
 # ╠═287ee7aa-0435-11eb-0ca3-951dbbe69404
 # ╠═24a15056-de95-4a05-add8-d25ce35031cd
 # ╟─9611ca24-0403-11eb-3582-b7e3bb243e62
