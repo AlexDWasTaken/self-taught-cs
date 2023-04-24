@@ -713,7 +713,6 @@ function gradient_2d_viz_2d(N_gradient_2d, x0, y0)
 		gradient_descent_2d_step(himmelbau, old...)
 	end
 
-	print(history)
 	
 	all = [[x0, y0], history...]
 	
@@ -949,7 +948,7 @@ md"""
 # ╔═╡ 6e1b5b6a-12e8-11eb-3655-fb10c4566cdc
 found_β, found_γ = let
 	
-	β, γ = gradient_descent_2d(loss_sir, 0, 0; η = 1e-10)
+	β, γ = gradient_descent_2d(loss_sir, 0, 0; η = 1e-8)
 	
 	β, γ
 end
@@ -2334,9 +2333,9 @@ version = "1.4.1+0"
 # ╠═d33271a2-12df-11eb-172a-bd5600265f49
 # ╟─ed344a8c-12df-11eb-03a3-2922620fd20f
 # ╟─8ae98c74-12e0-11eb-2802-d9a544d8b7ae
-# ╟─88b30f10-12e1-11eb-383d-4f095625cd16
+# ╠═88b30f10-12e1-11eb-383d-4f095625cd16
 # ╟─a53cf3f8-12e1-11eb-0b0c-2b794a7ac841
-# ╟─90114f98-12e0-11eb-2011-a3207bbc24f6
+# ╠═90114f98-12e0-11eb-2011-a3207bbc24f6
 # ╟─754e4c48-12df-11eb-3818-f54f6fc7176b
 # ╠═9489009a-12e8-11eb-2fb7-97ba0bdf339c
 # ╠═34dc4b02-1248-11eb-26b2-5d2610cfeb41
@@ -2357,7 +2356,7 @@ version = "1.4.1+0"
 # ╠═605aafa4-12e7-11eb-2d13-7f7db3fac439
 # ╟─9ae4ebac-12e3-11eb-0acc-23113f5264a9
 # ╟─5e0f16b4-12e3-11eb-212f-e565f97adfed
-# ╠═b6ae4d7e-12e6-11eb-1f92-c95c040d4401
+# ╟─b6ae4d7e-12e6-11eb-1f92-c95c040d4401
 # ╟─a03890d6-1248-11eb-37ee-85b0a5273e0c
 # ╠═6d1ee93e-1103-11eb-140f-63fca63f8b06
 # ╟─8261eb92-106e-11eb-2ccc-1348f232f5c3
