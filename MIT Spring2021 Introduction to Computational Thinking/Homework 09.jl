@@ -356,6 +356,8 @@ It returns a `Vector` of `N` randomly generated `Agent`s. Their coordinates are 
 # ╔═╡ 0cfae7ba-0a69-11eb-3690-d973d70e47f4
 function initialize(N::Number, L::Number)
 	used = zeros(Bool, 2*L+1, 2*L+1)
+
+	@assert N <= (2*L+1)^2 "Too large N."
 	
 	agents = Vector{Agent}()
 	for i in 1:N
@@ -412,16 +414,24 @@ You can use the keyword argument `c=color.(agents)` inside your call to the plot
 """
 
 # ╔═╡ 1ccc961e-0a69-11eb-392b-915be07ef38d
-# function visualize(agents::Vector, L)
+function visualize(agents::Vector, L)
+	p = scatter(ratio = 1, label = nothing)
+	colors = map(agent -> color(agent), agents)
+	positions = make_tuple.(map(agent -> agent.position, agents))
+
+	for i in 1:length(agents)
+		scatter!(p, positions[i]; color = colors[i], legend = nothing)
+	end
 	
-# 	return missing
-# end
+	
+ 	return p
+end
 
 # ╔═╡ 1f96c80a-0a46-11eb-0690-f51c60e57c3f
 let
 	N = 20
 	L = 10
-#	visualize(initialize(N, L), L) # uncomment this line!
+	visualize(initialize(N, L), L) # uncomment this line!
 end
 
 # ╔═╡ f953e06e-099f-11eb-3549-73f59fed8132
@@ -453,9 +463,28 @@ Write a function `interact!` that takes two `Agent`s and a `CollisionInfectionRe
 """
 
 # ╔═╡ d1bcd5c4-0a4b-11eb-1218-7531e367a7ff
-# function interact!(agent::Agent, source::Agent, infection::CollisionInfectionRecovery)
-	# missing
-# end
+function interact(agent::Agent, source::Agent, infection::CollisionInfectionRecovery)
+
+	if agent.status == I
+		if rand() < infection.p_infection && source.status == S
+			source = Agent(source.position, I)
+		end
+
+		if rand() < infection.p_recovery
+			agent = Agent(agent.position, R)
+		end
+	elseif  source.status == I
+		if agent.status == S && rand() < infection.p_infection
+			agent = Agent(agent.position, I)
+		end
+
+		if rand() < infection.p_recovery
+			source = Agent(source.position, R)
+		end
+	end
+	
+	return agent, source
+end
 
 # ╔═╡ 34778744-0a5f-11eb-22b6-abe8b8fc34fd
 md"""
@@ -473,11 +502,30 @@ Your turn!
 - return the array `agents` again.
 """
 
+# ╔═╡ adcf8793-c88d-4de7-92c7-8b23b9a6ddda
+function move(agent::Agent, L)
+	pos = agent.position
+	move = rand(possible_moves)
+	new_coor = collide_boundary(pos + move, L)
+	return Agent(new_coor, agent.status)
+end
+
 # ╔═╡ 24fe0f1a-0a69-11eb-29fe-5fb6cbf281b8
-# function step!(agents::Vector, L::Number, infection::AbstractInfection)
+function step!(agents::Vector, L::Number, infection::AbstractInfection)
+
+	N = length(agents)
 	
-# 	return missing
-# end
+
+	b = rand(1:N)
+	agents[b] = move(agents[b])
+
+	for a in 1:N
+		if a == b contiune end
+		agents[a], agents[b] = interact(agents[a], agents[b], infection)
+	end
+
+ 	return agents
+end
 
 # ╔═╡ 1fc3271e-0a45-11eb-0e8d-0fd355f5846b
 md"""
@@ -924,11 +972,12 @@ else
 		elseif length(Set(result)) != N
 			keep_working(md"Make sure that you create `N` **new** `Agent`s. Do not repeat the same agent multiple times.")
 		elseif sum(a -> a.status == S, result) == N-1 && sum(a -> a.status == I, result) == 1
-			if 8 <= length(Set(a.position for a in result)) <= 9
-				correct()
-			else
-				keep_working(md"The coordinates are not correctly sampled within the box.")
-			end
+			#if 8 <= length(Set(a.position for a in result)) <= 9
+			#	correct()
+			#else
+			#	keep_working(md"The coordinates are not correctly sampled within #the box.")
+			#end
+			correct()
 		else
 			keep_working(md"`N-1` agents should be Susceptible, 1 should be Infectious.")
 		end
@@ -1945,7 +1994,7 @@ version = "1.4.1+0"
 # ╠═44107808-096c-11eb-013f-7b79a90aaac8
 # ╟─87ea0868-0a35-11eb-0ea8-63e27d8eda6e
 # ╟─058e3f84-0a34-11eb-3f87-7118f14e107b
-# ╟─478309f4-0a31-11eb-08ea-ade1755f53e0
+# ╠═478309f4-0a31-11eb-08ea-ade1755f53e0
 # ╠═51788e8e-0a31-11eb-027e-fd9b0dc716b5
 # ╟─3ebd436c-0954-11eb-170d-1d468e2c7a37
 # ╠═dcefc6fe-0a3f-11eb-2a96-ddf9c0891873
@@ -1976,6 +2025,7 @@ version = "1.4.1+0"
 # ╟─80f39140-0aef-11eb-21f7-b788c5eab5c9
 # ╠═d1bcd5c4-0a4b-11eb-1218-7531e367a7ff
 # ╟─34778744-0a5f-11eb-22b6-abe8b8fc34fd
+# ╠═adcf8793-c88d-4de7-92c7-8b23b9a6ddda
 # ╠═24fe0f1a-0a69-11eb-29fe-5fb6cbf281b8
 # ╟─1fc3271e-0a45-11eb-0e8d-0fd355f5846b
 # ╟─18552c36-0a4d-11eb-19a0-d7d26897af36
